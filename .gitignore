@@ -1,1 +1,11 @@
 /target
+/sigma
+/central-sigma-rules
+/splunk
+/awesome-suricata
+/suricata
+/central-suricata-rules
+/awesome-yara
+/yara
+/central-yara-rules
+/temp_tar_extraction
