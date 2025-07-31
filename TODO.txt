@@ -1,55 +1,22 @@
-# Add IOC section
-
-## filename
-https://www.botvrij.eu/data/ioclist.filename
-
-## sha256
-https://www.botvrij.eu/data/ioclist.sha256
-
-## sha1
-https://www.botvrij.eu/data/ioclist.sha1
-
-## md5
-https://www.botvrij.eu/data/ioclist.md5
-
-## ip
-https://www.binarydefense.com/banlist.txt
-https://www.botvrij.eu/data/ioclist.ip-dst
-https://cinsscore.com/list/ci-badguys.txt
-
-## Domain
-https://www.botvrij.eu/data/ioclist.domain
-
-## URL
-https://www.botvrij.eu/data/ioclist.url
-
-## Email
-https://www.botvrij.eu/data/ioclist.email-src
-
-## Registry Keys
-https://www.botvrij.eu/data/ioclist.regkey
-
-# All IOCs
-https://github.com/eset/malware-ioc
-
-
-
 # more yara
 # more suricata
+
+
+
+
+
+
 
 # make daily ability
 
 
 
+get running on windows
+- create exe
 
 
 
-
-
-
-
-
-
+all section on ioc
 
 
 

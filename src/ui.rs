@@ -16,9 +16,9 @@ pub fn load_icon(path: &str) -> Option<IconData> {
     })
 }
 
-pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context) {
+pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_menu: impl FnMut()) {
     egui::CentralPanel::default().show(ctx, |ui| {
-        let mut show_progress = false;
+        let show_progress = false;
 
         if let Ok(mut guard) = app.progress.lock() {
             if let Some((current, total)) = *guard {
@@ -120,6 +120,12 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context) {
                     }
                 }
             }
+        }
+        ui.separator();
+
+        if ui.button("⬅ Back to Menu").clicked() {
+            back_to_menu();
+            return;
         }
     });
 }

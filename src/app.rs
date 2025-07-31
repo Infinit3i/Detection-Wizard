@@ -1,14 +1,13 @@
 use crate::ui;
+use crate::ui::load_icon;
 use eframe::{egui, App, Frame, NativeOptions};
 use std::sync::{Arc, Mutex};
-use crate::ui::load_icon;
 
 pub struct ToolSelectorApp {
     pub selected: Vec<bool>,
     pub tool_names: Vec<&'static str>,
     pub progress: Arc<Mutex<Option<(usize, usize)>>>,
 }
-
 
 impl Default for ToolSelectorApp {
     fn default() -> Self {
@@ -22,7 +21,7 @@ impl Default for ToolSelectorApp {
 
 impl App for ToolSelectorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
-        ui::render_ui(self, ctx);
+        ui::render_ui(self, ctx, || {});
     }
 }
 
