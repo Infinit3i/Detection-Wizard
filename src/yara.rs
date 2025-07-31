@@ -5,9 +5,11 @@ use regex::Regex;
 use walkdir::WalkDir;
 use reqwest::blocking as reqwest;
 
+
+
 /// Process YARA rules by cloning the awesome-yara repo, parsing out rule links,
 /// and then processing additional lists defined for GitHub repos and webpage sources.
-pub fn process_yara() {
+pub fn process_yara(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
     println!("Processing YARA rules...");
 
     // Process the awesome-yara repository.
@@ -48,7 +50,12 @@ pub fn process_yara() {
         "https://github.com/Yara-Rules/rules.git",
         "https://github.com/roadwy/DefenderYara.git",
     ];
-    for repo_url in yara_github_repos {
+    let total = yara_github_repos.len();
+    for (index, repo_url) in yara_github_repos.iter().enumerate() {
+        if let Some(cb) = progress_callback.as_mut() {
+            cb(index + 1, total);
+        }
+        println!("Processing YARA GitHub repository: {}", repo_url);
         if !repo_url.is_empty() {
             process_yara_github_repo(repo_url);
         }

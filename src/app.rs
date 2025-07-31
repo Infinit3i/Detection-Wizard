@@ -1,18 +1,21 @@
 use crate::ui;
 use eframe::{egui, App, Frame, NativeOptions};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use crate::ui::load_icon;
 
 pub struct ToolSelectorApp {
     pub selected: Vec<bool>,
     pub tool_names: Vec<&'static str>,
+    pub progress: Arc<Mutex<Option<(usize, usize)>>>,
 }
+
 
 impl Default for ToolSelectorApp {
     fn default() -> Self {
         Self {
             selected: vec![false; 5],
             tool_names: vec!["Yara", "Suricata", "Sigma", "Splunk", "All"],
+            progress: Arc::new(Mutex::new(None)),
         }
     }
 }
