@@ -12,3 +12,6 @@ reqwest = { version = "0.11", features = ["blocking"] }
 zip = "0.5"
 flate2 = "1.0"
 tar = "0.4"
+eframe = "0.27"
+egui = "0.27"
+image = "0.25"

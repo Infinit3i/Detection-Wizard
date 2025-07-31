@@ -69,7 +69,7 @@ pub fn process_yara() {
 /// Clone and process the awesome-yara repository.
 fn process_awesome_yara() {
     let repo_url = "https://github.com/InQuest/awesome-yara.git";
-    let awesome_yara_path = "./awesome-yara";
+    let awesome_yara_path = "";
     println!("Cloning awesome-yara repository from {}...", repo_url);
     if let Err(e) = Repository::clone(repo_url, awesome_yara_path) {
         eprintln!("Failed to clone awesome-yara repo: {}", e);
@@ -98,7 +98,7 @@ fn process_awesome_yara() {
             eprintln!("Failed to clone {}: {}", link, e);
             continue;
         }
-        copy_rule_files(&repo_folder, "./central-yara-rules");
+        copy_rule_files(&repo_folder, "");
     }
 }
 
@@ -110,7 +110,11 @@ fn process_yara_github_repo(repo_url: &str) {
         eprintln!("Failed to clone {}: {}", repo_url, e);
         return;
     }
-    copy_rule_files(&repo_folder, "./central-yara-rules");
+    copy_rule_files(&repo_folder, "");
+
+    if let Err(e) = fs::remove_dir_all(&repo_folder) {
+        eprintln!("Failed to clean up cloned repo {}: {}", repo_folder, e);
+    }
 }
 
 /// Process an additional YARA webpage source. Depending on the URL, this function
@@ -134,7 +138,7 @@ fn process_yara_webpage_source(url: &str) {
                     }
                 };
                 let file_name = url.split('/').last().unwrap_or("downloaded.yar");
-                let dest_dir = "./central-yara-rules";
+                let dest_dir = "";
                 if let Err(e) = fs::create_dir_all(dest_dir) {
                     eprintln!("Failed to create directory {}: {}", dest_dir, e);
                     return;
@@ -219,12 +223,14 @@ fn extract_repo_name(repo_url: &str) -> String {
 }
 
 /// Recursively search for files ending with '.yar' or '.yara' in `src_dir`
-/// and copy them into `dest_dir`.
-fn copy_rule_files(src_dir: &str, dest_dir: &str) {
+/// and copy them into the central `./yara` folder.
+fn copy_rule_files(src_dir: &str, _unused_dest_dir: &str) {
+    let dest_dir = "./yara";
     if let Err(e) = fs::create_dir_all(dest_dir) {
         eprintln!("Failed to create destination directory {}: {}", dest_dir, e);
         return;
     }
+
     for entry in WalkDir::new(src_dir) {
         let entry = match entry {
             Ok(e) => e,
@@ -233,16 +239,29 @@ fn copy_rule_files(src_dir: &str, dest_dir: &str) {
                 continue;
             }
         };
+
         if entry.file_type().is_file() {
             let path = entry.path();
             if let Some(ext) = path.extension() {
                 if ext == "yar" || ext == "yara" {
-                    let file_name = path.file_name().unwrap();
-                    let dest_path = Path::new(dest_dir).join(file_name);
+                    let file_name = match path.file_name() {
+                        Some(name) => name,
+                        None => continue,
+                    };
+
+                    // Avoid overwriting duplicates by prefixing with a hash or repo name
+                    let unique_name = format!(
+                        "{}_{}",
+                        extract_repo_name(src_dir),
+                        file_name.to_string_lossy()
+                    );
+
+                    let dest_path = Path::new(dest_dir).join(unique_name);
+
                     if let Err(e) = fs::copy(path, &dest_path) {
                         eprintln!("Failed to copy file {:?}: {}", path, e);
                     } else {
-                        println!("Copied file {:?}", path);
+                        println!("Copied: {:?}", dest_path);
                     }
                 }
             }

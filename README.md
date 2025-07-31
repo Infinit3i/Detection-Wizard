@@ -53,17 +53,20 @@ Detection-Wizard leverages a variety of Rust libraries:
 
 ### Setup
 1. **Clone the Repository:**
+
    ```bash
    git clone https://github.com/yourusername/Detection-Wizard.git
    cd Detection-Wizard
    ```
 
 2. **Build the Project:**
+
    ```bash
    cargo build --release
    ```
 
 3. **Run the Tool:**
+
    ```bash
    cargo run --release
    ```
