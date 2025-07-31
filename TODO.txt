@@ -1,0 +1,11 @@
+add ioc
+- sha256
+- ip
+- domain
+- url
+
+
+more yara
+more suricata
+
+make daily ability
