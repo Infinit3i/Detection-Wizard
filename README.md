@@ -20,38 +20,15 @@
 - **Flexible Source Integration:**  
   Add new sources easily! Detection-Wizard supports pulling rules from raw files, HTML pages, ZIP archives, tar.gz files, and more. 📦
 
-- **Interactive CLI:**  
-  Use an intuitive multi-select menu to run one, multiple, or all rule processing modules at once. 🎛️
-
-## How It Works ⚙️
-
-Detection-Wizard leverages a variety of Rust libraries:
-- **Git2:** For cloning Git repositories. 🔄
-- **Dialoguer:** For building interactive command-line menus. 🖥️
-- **Reqwest:** For fetching remote content. 🌐
-- **WalkDir & Regex:** For parsing and recursively processing rule files. 🔍
-- **Zip, Flate2, and Tar:** For handling compressed archives. 📚
-
-### Workflow 🚀
-1. **Menu Selection:**  
-   Choose which tool(s) to run via an interactive menu. Options include YARA, Suricata, Sigma, Splunk, or "All". 🗳️
-
-2. **Repository Cloning:**  
-   The tool clones base repositories (e.g., awesome-yara and awesome-suricata) along with additional sources provided by the user. 🛠️
-
-3. **Rule Extraction:**  
-   After cloning, Detection-Wizard scans for rule files (such as `.yar`, `.yara`, `.rules`, `.yml`, `.yaml`, `.conf`, `.xml`, `.spl`) and consolidates them into central directories for easy management. 📁
-
-4. **Extensibility:**  
-   Easily extend the tool by adding new source URLs to the respective modules. 🔧
-
 ## Installation 🛠️
 
 ### Prerequisites
+
 - [Rust](https://www.rust-lang.org/) (latest stable version recommended) 🦀
 - [Git](https://git-scm.com/) 🔧
 
 ### Setup
+
 1. **Clone the Repository:**
 
    ```bash
@@ -78,12 +55,6 @@ Contributions are welcome! Whether you have suggestions for new sources, improve
 ## License 📄
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Resources & Acknowledgements 🙏
-
-- [awesome-yara](https://github.com/InQuest/awesome-yara) by InQuest. 📂
-- [awesome-suricata](https://github.com/satta/awesome-suricata) by satta. 🔗
-- Additional rule sets and contributions from the open-source community. 🌍
 
 ---
 
