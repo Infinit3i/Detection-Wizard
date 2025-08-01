@@ -1,9 +1,8 @@
-# more yara
 # more suricata
 
 
-# make daily ability
-
+# make daily ability (crontabl/schedultask)
+# download to files or locations
 
 
 get running on windows
