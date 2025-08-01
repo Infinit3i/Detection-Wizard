@@ -1,9 +1,1 @@
-# more [suricata](https://github.com/satta/awesome-suricata?tab=readme-ov-file#rule-sets)
 
-
-# make daily ability (crontabl/schedultask)
-# download to files or locations
-
-
-get running on windows
-- create exe
