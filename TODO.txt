@@ -2,25 +2,9 @@
 # more suricata
 
 
-
-
-
-
-
 # make daily ability
 
 
 
 get running on windows
 - create exe
-
-
-
-all section on ioc
-
-
-
-
-
-https://github.com/hslatman/awesome-threat-intelligence/blob/main/README.md
-- only got to BOTVRIJ.EU

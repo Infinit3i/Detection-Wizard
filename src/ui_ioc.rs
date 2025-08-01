@@ -84,10 +84,45 @@ fn download_ioc(ioc_type: &str) {
             fetch("https://www.binarydefense.com/banlist.txt");
             fetch("https://www.botvrij.eu/data/ioclist.ip-dst");
             fetch("https://cinsscore.com/list/ci-badguys.txt");
+            fetch("https://osint.bambenekconsulting.com/feeds/c2-ipmasterlist.txt");
+            fetch("https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt");
+            fetch("https://feodotracker.abuse.ch/downloads/ipblocklist.txt");
+            fetch("https://feodotracker.abuse.ch/downloads/ipblocklist_aggressive.txt");
+            fetch("https://iplists.firehol.org/files/firehol_level1.netset");
+            fetch("https://iplists.firehol.org/files/firehol_level2.netset");
+            fetch("https://iplists.firehol.org/files/firehol_level3.netset");
+            fetch("https://lists.blocklist.de/lists/all.txt");
+            fetch("https://rules.emergingthreats.net/blockrules/compromised-ips.txt");
+            fetch("https://gist.githubusercontent.com/BBcan177/bf29d47ea04391cb3eb0/raw/");
+            fetch("https://danger.rulez.sk/projects/bruteforceblocker/blist.php");
+            fetch("https://blocklist.greensnow.co/greensnow.txt");
+            fetch("https://raw.githubusercontent.com/LinuxTracker/Blocklists/master/HancitorIPs.txt");
+            fetch("https://www.dan.me.uk/torlist/");
+            fetch("https://zerodot1.deteque.com/main/ipfeeds/bad/ZeroDot1sBadIPs.txt");
+            fetch("https://zerodot1.deteque.com/main/ipfeeds/mining/ZeroDot1sMinerIPsLATEST.txt");
+            fetch("");
+            fetch("");
+            fetch("");
+            fetch("https://raw.githubusercontent.com/securityscorecard/SSC-Threat-Intel-IoCs/refs/heads/master/KillNet-DDoS-Blocklist/ipblocklist.txt");
         }
-        "Domain" => fetch("https://www.botvrij.eu/data/ioclist.domain"),
-        "URL" => fetch("https://www.botvrij.eu/data/ioclist.url"),
-        "Email" => fetch("https://www.botvrij.eu/data/ioclist.email-src"),
+        "Domain" => {
+        fetch("https://www.botvrij.eu/data/ioclist.domain");
+        fetch("https://gist.githubusercontent.com/BBcan177/4a8bf37c131be4803cb2/raw");
+        fetch("https://www.joewein.net/dl/bl/dom-bl.txt");
+        fetch("https://gist.githubusercontent.com/BBcan177/bf29d47ea04391cb3eb0/raw/");
+        fetch("https://raw.githubusercontent.com/Hestat/minerchk/master/hostslist.txt");
+        fetch("https://raw.githubusercontent.com/Hestat/minerchk/master/hostslist.txt");
+        }
+        "URL" => { 
+        fetch("https://www.botvrij.eu/data/ioclist.url");
+        fetch("https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt");
+        fetch("https://urlhaus.abuse.ch/downloads/text/");
+        fetch("https://urlhaus.abuse.ch/downloads/text_recent/");
+        }
+        "Email" => {
+        fetch("https://www.botvrij.eu/data/ioclist.email-src");
+        fetch("https://raw.githubusercontent.com/WSTNPHX/scripts-n-tools/master/malware-email-addresses.txt");
+        }
         "Registry" => fetch("https://www.botvrij.eu/data/ioclist.regkey"),
         _ => {}
     }

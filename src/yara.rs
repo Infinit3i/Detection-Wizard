@@ -49,6 +49,9 @@ pub fn process_yara(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>)
         "https://github.com/volexity/threat-intel.git",
         "https://github.com/Yara-Rules/rules.git",
         "https://github.com/roadwy/DefenderYara.git",
+        "https://github.com/SupportIntelligence/Icewater.git",
+        "https://github.com/InQuest/yara-rules.git",
+        "https://github.com/Neo23x0/signature-base.git",
     ];
     let total = yara_github_repos.len();
     for (index, repo_url) in yara_github_repos.iter().enumerate() {
