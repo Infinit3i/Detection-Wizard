@@ -12,11 +12,14 @@ use tar::Archive;
 /// Process Suricata rules from various sources: the awesome‑Suricata repo,
 /// additional GitHub repositories, webpage sources, ZIP files, and tar.gz archives.
 /// All rule files are copied into one central directory.
-pub fn process_suricata(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
+pub fn process_suricata(
+    output_path: &str,
+    mut progress_callback: Option<&mut dyn FnMut(usize, usize)>
+) {
     println!("Processing Suricata rules...");
 
     // Process the awesome‑Suricata repository first.
-    process_awesome_suricata();
+    process_awesome_suricata(output_path);
 
     // Additional GitHub repositories.
     let github_repos = vec![
@@ -37,7 +40,7 @@ pub fn process_suricata(mut progress_callback: Option<&mut dyn FnMut(usize, usiz
     ];
     for repo_url in github_repos {
         if !repo_url.is_empty() {
-            process_github_repo(repo_url);
+            process_github_repo(repo_url, output_path);
         }
     }
 
@@ -62,16 +65,16 @@ pub fn process_suricata(mut progress_callback: Option<&mut dyn FnMut(usize, usiz
     ];
     for page_url in webpage_sources {
         if !page_url.is_empty() {
-            process_webpage_source(page_url);
+            process_webpage_source(page_url, output_path);
         }
     }
 }
 
 /// Process the awesome‑Suricata repository by cloning it, parsing its README,
 /// and then processing each rule repository link.
-fn process_awesome_suricata() {
+fn process_awesome_suricata(output_path: &str) {
     let repo_url = "https://github.com/satta/awesome-suricata.git";
-    let awesome_suricata_path = "./awesome-suricata";
+    let awesome_suricata_path = "./suricata";
     println!("Cloning awesome-suricata repository from {}...", repo_url);
     if let Err(e) = Repository::clone(repo_url, awesome_suricata_path) {
         eprintln!("Failed to clone awesome-suricata repo: {}", e);
@@ -96,19 +99,19 @@ fn process_awesome_suricata() {
             eprintln!("Failed to clone {}: {}", link, e);
             continue;
         }
-        copy_rule_files(&repo_folder, "./suricata");
+        copy_rule_files(&repo_folder, output_path);
     }
 }
 
 /// Process a GitHub repository URL: clone it and copy any Suricata rule files.
-fn process_github_repo(repo_url: &str) {
+fn process_github_repo(repo_url: &str, output_path: &str) {
     println!("Processing GitHub repository: {}", repo_url);
     let repo_folder = format!("./suricata/{}", extract_repo_name(repo_url));
     if let Err(e) = Repository::clone(repo_url, &repo_folder) {
         eprintln!("Failed to clone {}: {}", repo_url, e);
         return;
     }
-    copy_rule_files(&repo_folder, "./suricata");
+    copy_rule_files(&repo_folder, output_path);
 }
 
 /// Process a webpage source URL. Depending on the URL extension, treat it as:
@@ -116,7 +119,7 @@ fn process_github_repo(repo_url: &str) {
 /// - A tar.gz archive to extract.
 /// - A raw rules file (.rules) to download directly.
 /// - An HTML page to extract further links.
-fn process_webpage_source(url: &str) {
+fn process_webpage_source(url: &str, output_path: &str) {
     println!("Processing webpage source: {}", url);
 
     if url.ends_with(".zip") {
@@ -135,7 +138,7 @@ fn process_webpage_source(url: &str) {
                         return;
                     }
                 };
-                process_zip_file(url, &bytes);
+                process_zip_file(url, &bytes, output_path);
             },
             Err(e) => eprintln!("Error fetching {}: {}", url, e),
         }
@@ -155,7 +158,7 @@ fn process_webpage_source(url: &str) {
                         return;
                     }
                 };
-                process_tar_gz_file(url, &bytes);
+                process_tar_gz_file(url, &bytes, output_path);
             },
             Err(e) => eprintln!("Error fetching {}: {}", url, e),
         }
@@ -176,7 +179,7 @@ fn process_webpage_source(url: &str) {
                     }
                 };
                 let file_name = url.split('/').last().unwrap_or("downloaded.rules");
-                let dest_dir = "./suricata";
+                let dest_dir = output_path;
                 if let Err(e) = fs::create_dir_all(dest_dir) {
                     eprintln!("Failed to create directory {}: {}", dest_dir, e);
                     return;
@@ -210,7 +213,7 @@ fn process_webpage_source(url: &str) {
                 println!("Found {} rule links on webpage.", rule_links.len());
                 // Recursively process each extracted link.
                 for link in rule_links {
-                    process_webpage_source(&link);
+                    process_webpage_source(&link, output_path);
                 }
             },
             Err(e) => eprintln!("Error fetching {}: {}", url, e),
@@ -219,7 +222,7 @@ fn process_webpage_source(url: &str) {
 }
 
 /// Process a ZIP file by unzipping its content and then copying any .rules files.
-fn process_zip_file(url: &str, zip_data: &[u8]) {
+fn process_zip_file(url: &str, zip_data: &[u8], output_path: &str) {
     println!("Processing ZIP file from {}", url);
     let temp_dir = "./temp_zip_extraction";
     let _ = fs::remove_dir_all(temp_dir);
@@ -279,7 +282,7 @@ fn process_zip_file(url: &str, zip_data: &[u8]) {
 }
 
 /// Process a tar.gz file by uncompressing and unpacking its content, then copying any .rules files.
-fn process_tar_gz_file(url: &str, tar_data: &[u8]) {
+fn process_tar_gz_file(url: &str, tar_data: &[u8], output_path: &str) {
     println!("Processing tar.gz file from {}", url);
     let temp_dir = "./temp_tar_extraction";
     let _ = fs::remove_dir_all(temp_dir);

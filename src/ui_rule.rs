@@ -1,5 +1,4 @@
 use crate::download::render_output_path_selector;
-use crate::download::{start_download, DownloadFormat};
 use crate::rule_menu::ToolSelectorApp;
 use crate::{sigma, splunk, suricata, yara};
 use eframe::egui;
@@ -107,16 +106,20 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     let ctx = ctx.clone();
                     let progress = Arc::clone(&app.progress);
 
-
                     if app.selected[4] {
+                        let out_path = app
+                            .custom_path
+                            .clone()
+                            .unwrap_or_else(|| "./rule_output/suricata".to_string());
+
                         run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
                             yara::process_yara(Some(cb));
                         });
                         run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
                             sigma::process_sigma(Some(cb));
                         });
-                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
-                            suricata::process_suricata(Some(cb));
+                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), move |cb| {
+                            suricata::process_suricata(&out_path, Some(cb));
                         });
                         run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
                             splunk::process_splunk(Some(cb));
@@ -133,9 +136,15 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                     "Sigma" => run_tool_with_progress(ctx, progress, |cb| {
                                         sigma::process_sigma(Some(cb));
                                     }),
-                                    "Suricata" => run_tool_with_progress(ctx, progress, |cb| {
-                                        suricata::process_suricata(Some(cb));
-                                    }),
+                                    "Suricata" => {
+                                        let out_path =
+                                            app.custom_path.clone().unwrap_or_else(|| {
+                                                "./rule_output/suricata".to_string()
+                                            });
+                                        run_tool_with_progress(ctx, progress, move |cb| {
+                                            suricata::process_suricata(&out_path, Some(cb));
+                                        });
+                                    }
                                     "Splunk" => run_tool_with_progress(ctx, progress, |cb| {
                                         splunk::process_splunk(Some(cb));
                                     }),
