@@ -30,13 +30,13 @@ impl App for MainApp {
         let mut new_screen = None;
 
         match &mut screen {
-            Screen::ToolSelector(ref mut tool_app) => {
+            Screen::ToolSelector(tool_app) => {
                 ui_rule::render_ui(tool_app, ctx, || {
                     new_screen = Some(Screen::Menu);
                 });
             }
 
-            Screen::IOCDownloader(ref mut ioc_app) => {
+            Screen::IOCDownloader(ioc_app) => {
                 ui_ioc::render_ui_ioc(ioc_app, ctx, || {
                     new_screen = Some(Screen::Menu);
                 });
