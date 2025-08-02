@@ -17,7 +17,7 @@ pub fn process_splunk(mut progress_callback: Option<&mut dyn FnMut(usize, usize)
     if let Err(e) = Repository::clone(base_repo_url, splunk_repo_path) {
         eprintln!("Failed to clone splunk repo {}: {}", base_repo_url, e);
     } else {
-        copy_splunk_rule_files(splunk_repo_path, "./central-splunk-rules");
+        copy_splunk_rule_files(splunk_repo_path, "./splunk");
     }
 
     // Additional Splunk GitHub repositories.
@@ -51,7 +51,7 @@ fn process_splunk_github_repo(repo_url: &str) {
         eprintln!("Failed to clone {}: {}", repo_url, e);
         return;
     }
-    copy_splunk_rule_files(&repo_folder, "./central-splunk-rules");
+    copy_splunk_rule_files(&repo_folder, "./splunk");
 }
 
 /// Process an additional Splunk webpage source.
@@ -75,7 +75,7 @@ fn process_splunk_webpage_source(url: &str) {
                     }
                 };
                 let file_name = url.split('/').last().unwrap_or("downloaded.conf");
-                let dest_dir = "./central-splunk-rules";
+                let dest_dir = "./splunk";
                 if let Err(e) = fs::create_dir_all(dest_dir) {
                     eprintln!("Failed to create directory {}: {}", dest_dir, e);
                     return;

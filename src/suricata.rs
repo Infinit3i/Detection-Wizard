@@ -96,7 +96,7 @@ fn process_awesome_suricata() {
             eprintln!("Failed to clone {}: {}", link, e);
             continue;
         }
-        copy_rule_files(&repo_folder, "./central-suricata-rules");
+        copy_rule_files(&repo_folder, "./suricata");
     }
 }
 
@@ -108,7 +108,7 @@ fn process_github_repo(repo_url: &str) {
         eprintln!("Failed to clone {}: {}", repo_url, e);
         return;
     }
-    copy_rule_files(&repo_folder, "./central-suricata-rules");
+    copy_rule_files(&repo_folder, "./suricata");
 }
 
 /// Process a webpage source URL. Depending on the URL extension, treat it as:
@@ -176,7 +176,7 @@ fn process_webpage_source(url: &str) {
                     }
                 };
                 let file_name = url.split('/').last().unwrap_or("downloaded.rules");
-                let dest_dir = "./central-suricata-rules";
+                let dest_dir = "./suricata";
                 if let Err(e) = fs::create_dir_all(dest_dir) {
                     eprintln!("Failed to create directory {}: {}", dest_dir, e);
                     return;
@@ -275,7 +275,7 @@ fn process_zip_file(url: &str, zip_data: &[u8]) {
         }
     }
     println!("ZIP extraction complete to {}", temp_dir);
-    copy_rule_files(temp_dir, "./central-suricata-rules");
+    copy_rule_files(temp_dir, "./suricata");
 }
 
 /// Process a tar.gz file by uncompressing and unpacking its content, then copying any .rules files.
@@ -295,7 +295,7 @@ fn process_tar_gz_file(url: &str, tar_data: &[u8]) {
         return;
     }
     println!("tar.gz extraction complete to {}", temp_dir);
-    copy_rule_files(temp_dir, "./central-suricata-rules");
+    copy_rule_files(temp_dir, "./suricata");
 }
 
 /// Parse markdown content to extract links between "## Rules" and "## Tools".

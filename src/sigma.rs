@@ -16,7 +16,7 @@ pub fn process_sigma(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>
     if let Err(e) = Repository::clone(repo_url, sigma_repo_path) {
         eprintln!("Failed to clone sigma repo: {}", e);
     } else {
-        copy_sigma_rule_files(sigma_repo_path, "./central-sigma-rules");
+        copy_sigma_rule_files(sigma_repo_path, "./sigma");
     }
 
     // Additional Sigma GitHub repositories.
@@ -75,7 +75,7 @@ fn process_sigma_webpage_source(url: &str) {
                     }
                 };
                 let file_name = url.split('/').last().unwrap_or("downloaded.yml");
-                let dest_dir = "./central-sigma-rules";
+                let dest_dir = "./sigma";
                 if let Err(e) = fs::create_dir_all(dest_dir) {
                     eprintln!("Failed to create directory {}: {}", dest_dir, e);
                     return;
