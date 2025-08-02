@@ -17,15 +17,6 @@
   - [awesome-suricata](https://github.com/satta/awesome-suricata) 🔗
   - Plus, many additional GitHub and web-based resources. 🌍
 
-- **Flexible Source Integration:**  
-  Add new sources easily! Detection-Wizard supports pulling rules from raw files, HTML pages, ZIP archives, tar.gz files, and more. 📦
-
-## Installation 🛠️
-
-### Prerequisites
-
-- [Rust](https://www.rust-lang.org/) (latest stable version recommended) 🦀
-- [Git](https://git-scm.com/) 🔧
 
 ### Setup
 
