@@ -40,7 +40,7 @@ pub fn run() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "Rust GUI Tool Selector",
+        "Detection Wizard",
         options,
         Box::new(|_cc| Box::<ToolSelectorApp>::default()),
     )

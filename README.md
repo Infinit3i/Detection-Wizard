@@ -32,7 +32,7 @@
 1. **Clone the Repository:**
 
    ```bash
-   git clone https://github.com/yourusername/Detection-Wizard.git
+   git clone https://github.com/infinit3i/Detection-Wizard.git
    cd Detection-Wizard
    ```
 

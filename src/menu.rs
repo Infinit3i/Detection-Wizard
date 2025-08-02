@@ -48,7 +48,7 @@ impl App for MainApp {
                     ui.separator();
                     ui.label("Choose a toolset to begin:");
 
-                    if ui.button("🛠 Tool Selector").clicked() {
+                    if ui.button("🛠 Rules").clicked() {
                         new_screen = Some(Screen::ToolSelector(Default::default()));
                     }
 
