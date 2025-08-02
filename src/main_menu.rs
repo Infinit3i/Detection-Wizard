@@ -1,7 +1,7 @@
-use crate::{app::ToolSelectorApp, ioc_menu::IOCSelectorApp, ui, ui_ioc};
+use crate::{ioc_menu::IOCSelectorApp, rule_menu::ToolSelectorApp, ui_ioc, ui_rule};
 use eframe::{egui, App, Frame};
+use egui::Color32;
 use egui::Margin;
-
 
 pub enum Screen {
     Menu,
@@ -31,7 +31,7 @@ impl App for MainApp {
 
         match &mut screen {
             Screen::ToolSelector(ref mut tool_app) => {
-                ui::render_ui(tool_app, ctx, || {
+                ui_rule::render_ui(tool_app, ctx, || {
                     new_screen = Some(Screen::Menu);
                 });
             }
@@ -46,22 +46,49 @@ impl App for MainApp {
                 egui::CentralPanel::default()
                     .frame(
                         egui::Frame::default()
-                            .inner_margin(Margin::same(30.0)).outer_margin(Margin::same(20.0)),
+                            .inner_margin(Margin::same(30.0))
+                            .outer_margin(Margin::same(20.0)),
                     )
                     .show(ctx, |ui| {
                         ui.heading("🔧 Detection Wizard");
                         ui.separator();
-                        ui.label("Choose a toolset to begin:");
-
-                        if ui.button("🛠 Rules").clicked() {
+                        ui.add_space(10.0);
+                        ui.label("Choose IOA or IOC:");
+                        ui.add_space(15.0);
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    egui::RichText::new("🛠 Rules").color(Color32::WHITE),
+                                )
+                                .fill(Color32::from_rgb(70, 130, 180)), // SteelBlue
+                            )
+                            .clicked()
+                        {
                             new_screen = Some(Screen::ToolSelector(Default::default()));
                         }
+                        ui.add_space(5.0);
 
-                        if ui.button("📥 IOC Downloader").clicked() {
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    egui::RichText::new("📥 IOCs").color(Color32::WHITE),
+                                )
+                                .fill(Color32::from_rgb(60, 179, 113)), // MediumSeaGreen
+                            )
+                            .clicked()
+                        {
                             new_screen = Some(Screen::IOCDownloader(Default::default()));
                         }
-
-                        if ui.button("❌ Quit").clicked() {
+                        ui.add_space(40.0);
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    egui::RichText::new("❌ Quit").color(Color32::WHITE),
+                                )
+                                .fill(Color32::from_rgb(220, 20, 60)), // Crimson
+                            )
+                            .clicked()
+                        {
                             std::process::exit(0);
                         }
                     });

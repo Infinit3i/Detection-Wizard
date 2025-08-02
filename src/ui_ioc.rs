@@ -1,42 +1,11 @@
+use crate::download::render_output_path_selector;
+use crate::download::{start_download, DownloadFormat};
 use crate::ioc_menu::{IOCSelectorApp, OutputFormat};
 use eframe::egui;
+use egui::Margin;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::Mutex;
-use std::thread;
-use egui::Margin;
-
-
-fn start_download(
-    all_urls: Vec<(String, String)>,
-    format: OutputFormat,
-    output_path: String,
-    progress: Arc<Mutex<Option<(usize, usize)>>>,
-    ctx: egui::Context,
-) {
-    let total = all_urls.len();
-    *progress.lock().unwrap() = Some((0, total));
-
-    thread::spawn(move || {
-        let mut completed = 0;
-        for (url, ioc_type) in all_urls {
-            fetch_and_append_to_file(
-                &url,
-                &ioc_type,
-                &format,
-                &output_path,
-                Some(&mut || {
-                    completed += 1;
-                    if let Ok(mut p) = progress.lock() {
-                        *p = Some((completed, total));
-                    }
-                    ctx.request_repaint();
-                }),
-            );
-        }
-    });
-}
 
 fn fetch_and_append_to_file(
     url: &str,
@@ -107,7 +76,11 @@ pub fn render_ui_ioc(
     mut back_to_menu: impl FnMut(),
 ) {
     egui::CentralPanel::default()
-        .frame(egui::Frame::default().inner_margin(Margin::same(30.0)).outer_margin(Margin::same(20.0)))
+        .frame(
+            egui::Frame::default()
+                .inner_margin(Margin::same(30.0))
+                .outer_margin(Margin::same(20.0)),
+        )
         .show(ctx, |ui| {
             if !app.overwrite_queue.is_empty() && app.overwrite_index < app.overwrite_queue.len() {
                 egui::Window::new("⚠️ Overwrite Confirmation")
@@ -151,7 +124,11 @@ pub fn render_ui_ioc(
                         });
 
                         if app.overwrite_index >= app.overwrite_queue.len() {
-                            let format = app.output_format.clone();
+                            let format = match app.output_format {
+                                OutputFormat::Txt => DownloadFormat::Txt,
+                                OutputFormat::Csv => DownloadFormat::Csv,
+                            };
+
                             let output_path = app
                                 .custom_path
                                 .clone()
@@ -232,17 +209,7 @@ pub fn render_ui_ioc(
                 ui.radio_value(&mut app.output_format, OutputFormat::Csv, "CSV");
 
                 ui.separator();
-                if ui.button("Choose Output Folder").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                        app.custom_path = Some(path.display().to_string());
-                    }
-                }
-
-                if let Some(path) = &app.custom_path {
-                    ui.label(format!("Save path: {}", path));
-                } else {
-                    ui.label("Save path: ./ioc_output (default)");
-                }
+                render_output_path_selector(ui, &mut app.custom_path, "./ioc_output");
 
                 if ui.button("Run Selected").clicked() {
                     let selected_types = app
@@ -261,7 +228,6 @@ pub fn render_ui_ioc(
                         .clone()
                         .unwrap_or_else(|| "ioc_output".to_string());
 
-                    let format = app.output_format.clone();
                     let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
                     let mut overwrite_conflict = false;
 
@@ -274,11 +240,17 @@ pub fn render_ui_ioc(
                     }
 
                     app.overwrite_queue.clear();
+                    let ext = match app.output_format {
+                        OutputFormat::Txt => "txt",
+                        OutputFormat::Csv => "csv",
+                    };
+
+                    let download_format = match app.output_format {
+                        OutputFormat::Txt => DownloadFormat::Txt,
+                        OutputFormat::Csv => DownloadFormat::Csv,
+                    };
+
                     for (url, ioc_type) in &all_urls {
-                        let ext = match format {
-                            OutputFormat::Txt => "txt",
-                            OutputFormat::Csv => "csv",
-                        };
                         let filename = format!("{}-{}.{}", ioc_type.to_lowercase(), date_str, ext);
                         let path = Path::new(&output_path).join(filename);
                         if path.exists() {
@@ -293,7 +265,7 @@ pub fn render_ui_ioc(
                     } else {
                         start_download(
                             all_urls,
-                            format,
+                            download_format,
                             output_path,
                             Arc::clone(&app.progress),
                             ctx.clone(),
@@ -304,8 +276,17 @@ pub fn render_ui_ioc(
                 ui.separator();
             }
 
-            if ui.button("⬅ Back to Menu").clicked() {
+            if ui
+                .add(
+                    egui::Button::new(
+                        egui::RichText::new("⬅ Back to Menu").color(egui::Color32::WHITE),
+                    )
+                    .fill(egui::Color32::from_rgb(255, 140, 0)), // Orange
+                )
+                .clicked()
+            {
                 back_to_menu();
+                return;
             }
         });
 }

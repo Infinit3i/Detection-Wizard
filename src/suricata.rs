@@ -12,7 +12,7 @@ use tar::Archive;
 /// Process Suricata rules from various sources: the awesome‑Suricata repo,
 /// additional GitHub repositories, webpage sources, ZIP files, and tar.gz archives.
 /// All rule files are copied into one central directory.
-pub fn process_suricata() {
+pub fn process_suricata(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
     println!("Processing Suricata rules...");
 
     // Process the awesome‑Suricata repository first.
@@ -34,10 +34,6 @@ pub fn process_suricata() {
         "https://sslbl.abuse.ch/blacklist/sslblacklist_tls_cert.rules",
         "https://sslbl.abuse.ch/blacklist/ja3_fingerprints.rules",
         "https://urlhaus.abuse.ch/downloads/ids/",
-        "",
-        "",
-        "",
-        "",
     ];
     for repo_url in github_repos {
         if !repo_url.is_empty() {
@@ -63,18 +59,6 @@ pub fn process_suricata() {
         "https://security.etnetera.cz/feeds/etn_aggressive.rules",
         "https://raw.githubusercontent.com/travisbgreen/hunting-rules/master/hunting.rules",
         "https://rules.emergingthreats.net/open/suricata/rules/",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
     ];
     for page_url in webpage_sources {
         if !page_url.is_empty() {

@@ -6,7 +6,7 @@ use walkdir::WalkDir;
 use reqwest::blocking as reqwest;
 
 /// Process Sigma rules by cloning a base Sigma repository, and then processing additional sources.
-pub fn process_sigma() {
+pub fn process_sigma(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
     println!("Processing Sigma rules...");
 
     // Base Sigma repository (for example, the official sigma repository).

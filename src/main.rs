@@ -1,18 +1,19 @@
 // src/main.rs
 
-mod app;
+mod rule_menu;
 mod ioc_menu;
-mod menu;
-mod ui;
+mod main_menu;
+mod ui_rule;
 mod ui_ioc;
 mod yara;
 mod suricata;
 mod sigma;
 mod splunk;
+mod download;
 
 use eframe::{egui::ViewportBuilder, NativeOptions};
-use crate::menu::MainApp;
-use crate::ui::load_icon;
+use crate::main_menu::MainApp;
+use crate::ui_rule::load_icon;
 use std::sync::Arc;
 
 fn main() -> eframe::Result<()> {
