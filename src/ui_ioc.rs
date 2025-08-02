@@ -1,5 +1,5 @@
 use crate::download::render_output_path_selector;
-use crate::download::{start_download, DownloadFormat};
+use crate::download::{DownloadFormat, start_download};
 use crate::ioc_menu::{IOCSelectorApp, OutputFormat};
 use eframe::egui;
 use egui::Margin;
@@ -208,9 +208,11 @@ pub fn render_ui_ioc(
                 ui.radio_value(&mut app.output_format, OutputFormat::Txt, "TXT");
                 ui.radio_value(&mut app.output_format, OutputFormat::Csv, "CSV");
 
+                ui.add_space(10.0);
                 ui.separator();
+                ui.add_space(10.0);
                 render_output_path_selector(ui, &mut app.custom_path, "./ioc_output");
-
+                ui.add_space(10.0);
                 if ui.button("Run Selected").clicked() {
                     let selected_types = app
                         .ioc_types
@@ -272,8 +274,9 @@ pub fn render_ui_ioc(
                         );
                     }
                 }
-
+                ui.add_space(10.0);
                 ui.separator();
+                ui.add_space(10.0);
             }
 
             if ui

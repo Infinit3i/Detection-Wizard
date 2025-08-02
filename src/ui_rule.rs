@@ -98,10 +98,12 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         }
                     }
                 }
-
-                render_output_path_selector(ui, &mut app.custom_path, "./rule_output");
+                ui.add_space(10.0);
                 ui.separator();
+                ui.add_space(10.0);
+                render_output_path_selector(ui, &mut app.custom_path, "./rule_output");
 
+                ui.add_space(10.0);
                 if ui.button("Run Selected").clicked() {
                     let ctx = ctx.clone();
                     let progress = Arc::clone(&app.progress);
@@ -156,8 +158,9 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 }
             }
 
+            ui.add_space(10.0);
             ui.separator();
-
+            ui.add_space(10.0);
             if ui
                 .add(
                     egui::Button::new(
