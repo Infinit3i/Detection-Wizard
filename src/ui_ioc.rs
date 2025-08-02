@@ -3,9 +3,13 @@ use crate::download::{DownloadFormat, start_download};
 use crate::ioc_menu::{IOCSelectorApp, OutputFormat};
 use eframe::egui;
 use egui::Margin;
+use git2::Repository;
+use regex::Regex;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use walkdir::WalkDir;
 
 fn fetch_and_append_to_file(
     url: &str,
@@ -213,7 +217,23 @@ pub fn render_ui_ioc(
                 ui.add_space(10.0);
                 render_output_path_selector(ui, &mut app.custom_path, "./ioc_output");
                 ui.add_space(10.0);
+                ui.separator();
                 if ui.button("Run Selected").clicked() {
+                    let git_repos = vec![
+                        "https://github.com/avast/ioc.git",
+                        "https://github.com/DoctorWebLtd/malware-iocs.git",
+                        "https://github.com/eset/malware-ioc.git",
+                        "https://github.com/mandiant/iocs.git",
+                        "https://github.com/GoSecure/malware-ioc.git",
+                        "https://github.com/Neo23x0/signature-base.git",
+                        "https://github.com/advanced-threat-research/IOCs.git",
+                        "https://github.com/pan-unit42/iocs.git",
+                        "https://github.com/prodaft/malware-ioc.git",
+                        "https://github.com/RedDrip7/APT_Digital_Weapon.git",
+                        "https://github.com/sophoslabs/IoCs.git",
+                        "https://github.com/StrangerealIntel/DailyIOC.git",
+                    ];
+
                     let selected_types = app
                         .ioc_types
                         .iter()
@@ -221,14 +241,21 @@ pub fn render_ui_ioc(
                         .filter_map(|(i, &name)| if app.selected[i] { Some(name) } else { None })
                         .collect::<Vec<_>>();
 
-                    if selected_types.is_empty() {
-                        return;
-                    }
+                    let git_types = vec!["MD5", "SHA1", "SHA256", "Domain", "IP"];
+                    let selected_git_types: Vec<&str> = selected_types
+                        .iter()
+                        .cloned()
+                        .filter(|ty| git_types.contains(ty))
+                        .collect();
 
                     let output_path = app
                         .custom_path
                         .clone()
                         .unwrap_or_else(|| "ioc_output".to_string());
+
+                    for repo in &git_repos {
+                        process_git_iocs(repo, &output_path, &selected_git_types);
+                    }
 
                     let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
                     let mut overwrite_conflict = false;
@@ -289,16 +316,89 @@ pub fn render_ui_ioc(
                 .clicked()
             {
                 back_to_menu();
-                return;
             }
         });
+}
+
+pub fn process_git_iocs(repo_url: &str, output_path: &str, selected_types: &[&str]) {
+    let repo_name = repo_url
+        .split('/')
+        .last()
+        .unwrap_or("repo")
+        .replace(".git", "");
+    let clone_path = format!("./tmp_git_iocs/{}", repo_name);
+
+    if let Err(e) = Repository::clone(repo_url, &clone_path) {
+        eprintln!("❌ Failed to clone {}: {}", repo_url, e);
+        return;
+    }
+
+    let mut domains = HashSet::new();
+    let mut ips = HashSet::new();
+    let mut sha256s = HashSet::new();
+    let mut sha1s = HashSet::new();
+    let mut md5s = HashSet::new();
+
+    let domain_re =
+        Regex::new(r"(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b").unwrap();
+    let ip_re = Regex::new(r"\b\d{1,3}(?:\.\d{1,3}){3}\b").unwrap();
+    let sha256_re = Regex::new(r"\b[a-fA-F0-9]{64}\b").unwrap();
+    let sha1_re = Regex::new(r"\b[a-fA-F0-9]{40}\b").unwrap();
+    let md5_re = Regex::new(r"\b[a-fA-F0-9]{32}\b").unwrap();
+
+    for entry in WalkDir::new(&clone_path).into_iter().filter_map(Result::ok) {
+        let path = entry.path();
+        if path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(path) {
+                for line in content.lines() {
+                    for m in domain_re.find_iter(line) {
+                        domains.insert(m.as_str().to_string());
+                    }
+                    for m in ip_re.find_iter(line) {
+                        ips.insert(m.as_str().to_string());
+                    }
+                    for m in sha256_re.find_iter(line) {
+                        sha256s.insert(m.as_str().to_string());
+                    }
+                    for m in sha1_re.find_iter(line) {
+                        sha1s.insert(m.as_str().to_string());
+                    }
+                    for m in md5_re.find_iter(line) {
+                        md5s.insert(m.as_str().to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let save = |name: &str, data: &HashSet<String>| {
+        if !data.is_empty() {
+            let path = Path::new(output_path).join(format!("{}-{}.txt", name, date_str));
+            let joined = data.iter().cloned().collect::<Vec<_>>().join("\n");
+            if let Err(e) = fs::write(&path, joined) {
+                eprintln!("❌ Failed to write {}: {}", name, e);
+            } else {
+                println!("✅ Saved {} IOCs to {}", name, path.display());
+            }
+        }
+    };
+
+    save("domain", &domains);
+    save("ip", &ips);
+    save("sha256", &sha256s);
+    save("sha1", &sha1s);
+    save("md5", &md5s);
 }
 
 fn get_urls_for_ioc_type(ioc_type: &str) -> Vec<&'static str> {
     match ioc_type {
         "Filename" => vec!["https://www.botvrij.eu/data/ioclist.filename"],
         "SHA256" => vec!["https://www.botvrij.eu/data/ioclist.sha256"],
-        "SHA1" => vec!["https://www.botvrij.eu/data/ioclist.sha1"],
+        "SHA1" => vec![
+            "https://www.botvrij.eu/data/ioclist.sha1",
+            "https://raw.githubusercontent.com/bitdefender/malware-ioc/refs/heads/master/dark_nexus/all_bots.txt",
+        ],
         "MD5" => vec!["https://www.botvrij.eu/data/ioclist.md5"],
         "IP" => vec![
             "https://www.binarydefense.com/banlist.txt",
@@ -329,6 +429,9 @@ fn get_urls_for_ioc_type(ioc_type: &str) -> Vec<&'static str> {
             "https://www.joewein.net/dl/bl/dom-bl.txt",
             "https://gist.githubusercontent.com/BBcan177/bf29d47ea04391cb3eb0/raw/",
             "https://raw.githubusercontent.com/Hestat/minerchk/master/hostslist.txt",
+            "https://isc.sans.edu/feeds/suspiciousdomains_High.txt",
+            "https://isc.sans.edu/feeds/suspiciousdomains_Medium.txt",
+            "https://raw.githubusercontent.com/bitdefender/malware-ioc/refs/heads/master/metamorfo_malware/domains.txt",
         ],
         "URL" => vec![
             "https://www.botvrij.eu/data/ioclist.url",

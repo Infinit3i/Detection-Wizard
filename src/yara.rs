@@ -1,19 +1,20 @@
-use std::fs;
-use std::path::Path;
 use git2::Repository;
 use regex::Regex;
-use walkdir::WalkDir;
 use reqwest::blocking as reqwest;
-
-
+use std::fs;
+use std::path::Path;
+use walkdir::WalkDir;
 
 /// Process YARA rules by cloning the awesome-yara repo, parsing out rule links,
 /// and then processing additional lists defined for GitHub repos and webpage sources.
-pub fn process_yara(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
+pub fn process_yara(
+    output_path: &str,
+    mut progress_callback: Option<&mut dyn FnMut(usize, usize)>,
+) {
     println!("Processing YARA rules...");
 
     // Process the awesome-yara repository.
-    process_awesome_yara();
+    process_awesome_yara(output_path);
 
     // Additional YARA GitHub repositories.
     let yara_github_repos = vec![
@@ -94,7 +95,7 @@ pub fn process_yara(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>)
         }
         println!("Processing YARA GitHub repository: {}", repo_url);
         if !repo_url.is_empty() {
-            process_yara_github_repo(repo_url);
+            process_yara_github_repo(repo_url, output_path);
         }
     }
 
@@ -105,13 +106,13 @@ pub fn process_yara(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>)
     ];
     for page_url in yara_webpage_sources {
         if !page_url.is_empty() {
-            process_yara_webpage_source(page_url);
+            process_yara_webpage_source(page_url, output_path)
         }
     }
 }
 
 /// Clone and process the awesome-yara repository.
-fn process_awesome_yara() {
+fn process_awesome_yara(output_path: &str) {
     let repo_url = "https://github.com/InQuest/awesome-yara.git";
     let awesome_yara_path = "";
     println!("Cloning awesome-yara repository from {}...", repo_url);
@@ -142,19 +143,19 @@ fn process_awesome_yara() {
             eprintln!("Failed to clone {}: {}", link, e);
             continue;
         }
-        copy_rule_files(&repo_folder, "");
+        copy_rule_files(&repo_folder, output_path);
     }
 }
 
 /// Process an additional YARA GitHub repository.
-fn process_yara_github_repo(repo_url: &str) {
+fn process_yara_github_repo(repo_url: &str, output_path: &str) {
     println!("Processing YARA GitHub repository: {}", repo_url);
     let repo_folder = format!("./yara/{}", extract_repo_name(repo_url));
     if let Err(e) = Repository::clone(repo_url, &repo_folder) {
         eprintln!("Failed to clone {}: {}", repo_url, e);
         return;
     }
-    copy_rule_files(&repo_folder, "");
+    copy_rule_files(&repo_folder, output_path);
 
     if let Err(e) = fs::remove_dir_all(&repo_folder) {
         eprintln!("Failed to clean up cloned repo {}: {}", repo_folder, e);
@@ -163,7 +164,7 @@ fn process_yara_github_repo(repo_url: &str) {
 
 /// Process an additional YARA webpage source. Depending on the URL, this function
 /// either downloads a raw .yar/.yara file or treats the URL as an HTML page and extracts links.
-fn process_yara_webpage_source(url: &str) {
+fn process_yara_webpage_source(url: &str, output_path: &str) {
     println!("Processing YARA webpage source: {}", url);
     if url.ends_with(".yar") || url.ends_with(".yara") {
         // Process raw YARA file.
@@ -182,7 +183,7 @@ fn process_yara_webpage_source(url: &str) {
                     }
                 };
                 let file_name = url.split('/').last().unwrap_or("downloaded.yar");
-                let dest_dir = "";
+                let dest_dir = "./yara";
                 if let Err(e) = fs::create_dir_all(dest_dir) {
                     eprintln!("Failed to create directory {}: {}", dest_dir, e);
                     return;
@@ -193,7 +194,7 @@ fn process_yara_webpage_source(url: &str) {
                 } else {
                     println!("Saved YARA rule file to {:?}", dest_path);
                 }
-            },
+            }
             Err(e) => eprintln!("Error fetching {}: {}", url, e),
         }
     } else {
@@ -215,9 +216,9 @@ fn process_yara_webpage_source(url: &str) {
                 let rule_links = parse_links_from_html(&content);
                 println!("Found {} rule links on webpage.", rule_links.len());
                 for link in rule_links {
-                    process_yara_webpage_source(&link);
+                    process_yara_webpage_source(&link, output_path);
                 }
-            },
+            }
             Err(e) => eprintln!("Error fetching {}: {}", url, e),
         }
     }
@@ -259,17 +260,17 @@ fn parse_links_from_html(html: &str) -> Vec<String> {
 
 /// Extracts a simple repository name from its URL.
 fn extract_repo_name(repo_url: &str) -> String {
-    repo_url.trim_end_matches('/')
-            .split('/')
-            .last()
-            .unwrap_or("repo")
-            .to_string()
+    repo_url
+        .trim_end_matches('/')
+        .split('/')
+        .last()
+        .unwrap_or("repo")
+        .to_string()
 }
 
 /// Recursively search for files ending with '.yar' or '.yara' in `src_dir`
 /// and copy them into the central `./yara` folder.
-fn copy_rule_files(src_dir: &str, _unused_dest_dir: &str) {
-    let dest_dir = "./yara";
+fn copy_rule_files(src_dir: &str, dest_dir: &str) {
     if let Err(e) = fs::create_dir_all(dest_dir) {
         eprintln!("Failed to create destination directory {}: {}", dest_dir, e);
         return;

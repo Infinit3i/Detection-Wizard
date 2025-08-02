@@ -114,14 +114,23 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             .clone()
                             .unwrap_or_else(|| "./rule_output/suricata".to_string());
 
-                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
-                            yara::process_yara(Some(cb));
-                        });
-                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
-                            sigma::process_sigma(Some(cb));
+                        let yara_path = format!(
+                            "{}/yara",
+                            app.custom_path
+                                .clone()
+                                .unwrap_or_else(|| "./rule_output".to_string())
+                        );
+                        let suricata_path = yara_path.clone();
+
+                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), move |cb| {
+                            yara::process_yara(&yara_path, Some(cb));
                         });
                         run_tool_with_progress(ctx.clone(), Arc::clone(&progress), move |cb| {
-                            suricata::process_suricata(&out_path, Some(cb));
+                            suricata::process_suricata(&suricata_path, Some(cb));
+                        });
+
+                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
+                            sigma::process_sigma(Some(cb));
                         });
                         run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
                             splunk::process_splunk(Some(cb));
@@ -132,9 +141,17 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 let ctx = ctx.clone();
                                 let progress = Arc::clone(&progress);
                                 match app.tool_names[i] {
-                                    "Yara" => run_tool_with_progress(ctx, progress, |cb| {
-                                        yara::process_yara(Some(cb));
-                                    }),
+                                    "Yara" => {
+                                        let out_path = format!(
+                                            "{}/yara",
+                                            app.custom_path
+                                                .clone()
+                                                .unwrap_or_else(|| "./rule_output".to_string())
+                                        );
+                                        run_tool_with_progress(ctx, progress, move |cb| {
+                                            yara::process_yara(&out_path, Some(cb));
+                                        })
+                                    }
                                     "Sigma" => run_tool_with_progress(ctx, progress, |cb| {
                                         sigma::process_sigma(Some(cb));
                                     }),
