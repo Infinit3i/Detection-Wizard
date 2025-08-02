@@ -5,6 +5,8 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
+use egui::Margin;
+
 
 fn start_download(
     all_urls: Vec<(String, String)>,
@@ -104,176 +106,208 @@ pub fn render_ui_ioc(
     ctx: &egui::Context,
     mut back_to_menu: impl FnMut(),
 ) {
-    egui::CentralPanel::default().show(ctx, |ui| {
-        if !app.overwrite_queue.is_empty() && app.overwrite_index < app.overwrite_queue.len() {
-            egui::Window::new("⚠️ Overwrite Confirmation")
-                .collapsible(false)
-                .resizable(false)
-                .show(ctx, |ui| {
-                    let (url, ioc_type) = &app.overwrite_queue[app.overwrite_index];
-                    let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
-                    let ext = match app.output_format {
-                        OutputFormat::Txt => "txt",
-                        OutputFormat::Csv => "csv",
-                    };
-                    let filename = format!("{}-{}.{}", ioc_type.to_lowercase(), date_str, ext);
+    egui::CentralPanel::default()
+        .frame(egui::Frame::default().inner_margin(Margin::same(30.0)).outer_margin(Margin::same(20.0)))
+        .show(ctx, |ui| {
+            if !app.overwrite_queue.is_empty() && app.overwrite_index < app.overwrite_queue.len() {
+                egui::Window::new("⚠️ Overwrite Confirmation")
+                    .collapsible(false)
+                    .resizable(false)
+                    .show(ctx, |ui| {
+                        let (url, ioc_type) = &app.overwrite_queue[app.overwrite_index];
+                        let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
+                        let ext = match app.output_format {
+                            OutputFormat::Txt => "txt",
+                            OutputFormat::Csv => "csv",
+                        };
+                        let filename = format!("{}-{}.{}", ioc_type.to_lowercase(), date_str, ext);
 
-                    ui.label("Some files already exist. What do you want to do?");
-                    ui.horizontal(|ui| {
-                        if ui.button("Overwrite").clicked() {
-                            app.pending_urls
-                                .get_or_insert(Vec::new())
-                                .extend(app.overwrite_queue.drain(..));
+                        ui.label("Some files already exist. What do you want to do?");
+                        ui.horizontal(|ui| {
+                            if ui.button("Overwrite").clicked() {
+                                app.pending_urls
+                                    .get_or_insert(Vec::new())
+                                    .extend(app.overwrite_queue.drain(..));
+                                app.overwrite_queue.clear();
+                                app.overwrite_index = 0;
+                                app.confirm_overwrite = false;
+                            }
+                            if ui.button("Overwrite All").clicked() {
+                                app.yes_all = true;
+                                app.pending_urls
+                                    .get_or_insert(Vec::new())
+                                    .extend(app.overwrite_queue.drain(..));
+                                app.overwrite_index = 0;
+                                app.overwrite_queue.clear();
+                                app.confirm_overwrite = false;
+                            }
+                            if ui.button("Skip").clicked() {
+                                app.overwrite_index += 1;
+                            }
+                            if ui.button("Skip All").clicked() {
+                                app.skip_all = true;
+                                app.overwrite_index = app.overwrite_queue.len();
+                            }
+                        });
+
+                        if app.overwrite_index >= app.overwrite_queue.len() {
+                            let format = app.output_format.clone();
+                            let output_path = app
+                                .custom_path
+                                .clone()
+                                .unwrap_or_else(|| "ioc_output".to_string());
+                            let urls = app.pending_urls.take().unwrap_or_default();
                             app.overwrite_queue.clear();
                             app.overwrite_index = 0;
                             app.confirm_overwrite = false;
-                        }
-                        if ui.button("Overwrite All").clicked() {
-                            app.yes_all = true;
-                            app.pending_urls
-                                .get_or_insert(Vec::new())
-                                .extend(app.overwrite_queue.drain(..));
-                            app.overwrite_index = 0;
-                            app.overwrite_queue.clear();
-                            app.confirm_overwrite = false;
-                        }
-                        if ui.button("Skip").clicked() {
-                            app.overwrite_index += 1;
-                        }
-                        if ui.button("Skip All").clicked() {
-                            app.skip_all = true;
-                            app.overwrite_index = app.overwrite_queue.len();
+                            start_download(
+                                urls,
+                                format,
+                                output_path,
+                                Arc::clone(&app.progress),
+                                ctx.clone(),
+                            );
                         }
                     });
+                return;
+            }
 
-                    if app.overwrite_index >= app.overwrite_queue.len() {
-                        let format = app.output_format.clone();
-                        let output_path = app
-                            .custom_path
-                            .clone()
-                            .unwrap_or_else(|| "ioc_output".to_string());
-                        let urls = app.pending_urls.take().unwrap_or_default();
-                        app.overwrite_queue.clear();
-                        app.overwrite_index = 0;
-                        app.confirm_overwrite = false;
+            let mut show_progress = false;
+
+            if let Ok(mut guard) = app.progress.lock() {
+                if let Some((current, total)) = *guard {
+                    show_progress = true;
+
+                    let percent = (current as f32 / total as f32) * 100.0;
+                    ui.label(format!("Progress: {}/{} ({:.0}%)", current, total, percent));
+                    ui.add(egui::ProgressBar::new(percent / 100.0).show_percentage());
+
+                    if current >= total {
+                        *guard = None;
+                        show_progress = false; // Reset for next render
+                    }
+                }
+            }
+
+            if !show_progress {
+                ui.heading("Select IOC types to download:");
+
+                for (i, name) in app.ioc_types.iter().enumerate() {
+                    let was_checked = app.selected[i];
+                    let checkbox = ui.checkbox(&mut app.selected[i], *name);
+
+                    if checkbox.clicked() {
+                        if *name == "All" && app.selected[i] {
+                            // Turn ON all others
+                            for j in 0..app.ioc_types.len() {
+                                app.selected[j] = true;
+                            }
+                        } else if *name == "All" && !app.selected[i] {
+                            // Turn OFF all others
+                            for j in 0..app.ioc_types.len() {
+                                app.selected[j] = false;
+                            }
+                        } else {
+                            // If any individual is unchecked, disable All
+                            let all_index = app.ioc_types.iter().position(|&x| x == "All");
+                            if let Some(idx) = all_index {
+                                app.selected[idx] = false;
+                            }
+
+                            // If all individual are now selected, check All
+                            let all_selected =
+                                app.selected[..app.ioc_types.len() - 1].iter().all(|&v| v);
+                            if all_selected {
+                                if let Some(idx) = all_index {
+                                    app.selected[idx] = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ui.separator();
+                ui.label("Output format:");
+                ui.radio_value(&mut app.output_format, OutputFormat::Txt, "TXT");
+                ui.radio_value(&mut app.output_format, OutputFormat::Csv, "CSV");
+
+                ui.separator();
+                if ui.button("Choose Output Folder").clicked() {
+                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                        app.custom_path = Some(path.display().to_string());
+                    }
+                }
+
+                if let Some(path) = &app.custom_path {
+                    ui.label(format!("Save path: {}", path));
+                } else {
+                    ui.label("Save path: ./ioc_output (default)");
+                }
+
+                if ui.button("Run Selected").clicked() {
+                    let selected_types = app
+                        .ioc_types
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, &name)| if app.selected[i] { Some(name) } else { None })
+                        .collect::<Vec<_>>();
+
+                    if selected_types.is_empty() {
+                        return;
+                    }
+
+                    let output_path = app
+                        .custom_path
+                        .clone()
+                        .unwrap_or_else(|| "ioc_output".to_string());
+
+                    let format = app.output_format.clone();
+                    let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
+                    let mut overwrite_conflict = false;
+
+                    let mut all_urls: Vec<(String, String)> = Vec::new();
+                    for &ioc_type in &selected_types {
+                        let urls = get_urls_for_ioc_type(ioc_type);
+                        for url in urls {
+                            all_urls.push((url.to_string(), ioc_type.to_string()));
+                        }
+                    }
+
+                    app.overwrite_queue.clear();
+                    for (url, ioc_type) in &all_urls {
+                        let ext = match format {
+                            OutputFormat::Txt => "txt",
+                            OutputFormat::Csv => "csv",
+                        };
+                        let filename = format!("{}-{}.{}", ioc_type.to_lowercase(), date_str, ext);
+                        let path = Path::new(&output_path).join(filename);
+                        if path.exists() {
+                            overwrite_conflict = true;
+                            app.overwrite_queue.push((url.clone(), ioc_type.clone()));
+                        }
+                    }
+
+                    if overwrite_conflict {
+                        app.pending_urls = Some(all_urls);
+                        app.confirm_overwrite = true;
+                    } else {
                         start_download(
-                            urls,
+                            all_urls,
                             format,
                             output_path,
                             Arc::clone(&app.progress),
                             ctx.clone(),
                         );
                     }
-                });
-            return;
-        }
-
-        let mut show_progress = false;
-
-        if let Ok(mut guard) = app.progress.lock() {
-            if let Some((current, total)) = *guard {
-                show_progress = true;
-
-                let percent = (current as f32 / total as f32) * 100.0;
-                ui.label(format!("Progress: {}/{} ({:.0}%)", current, total, percent));
-                ui.add(egui::ProgressBar::new(percent / 100.0).show_percentage());
-
-                if current >= total {
-                    *guard = None;
-                    show_progress = false; // Reset for next render
                 }
-            }
-        }
 
-        if !show_progress {
-            ui.heading("Select IOC types to download:");
-
-            for (i, name) in app.ioc_types.iter().enumerate() {
-                ui.checkbox(&mut app.selected[i], *name);
+                ui.separator();
             }
 
-            ui.separator();
-            ui.label("Output format:");
-            ui.radio_value(&mut app.output_format, OutputFormat::Txt, "TXT");
-            ui.radio_value(&mut app.output_format, OutputFormat::Csv, "CSV");
-
-            ui.separator();
-            if ui.button("Choose Output Folder").clicked() {
-                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                    app.custom_path = Some(path.display().to_string());
-                }
+            if ui.button("⬅ Back to Menu").clicked() {
+                back_to_menu();
             }
-
-            if let Some(path) = &app.custom_path {
-                ui.label(format!("Save path: {}", path));
-            } else {
-                ui.label("Save path: ./ioc_output (default)");
-            }
-
-            if ui.button("Run Selected").clicked() {
-                let selected_types = app
-                    .ioc_types
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, &name)| if app.selected[i] { Some(name) } else { None })
-                    .collect::<Vec<_>>();
-
-                if selected_types.is_empty() {
-                    return;
-                }
-
-                let output_path = app
-                    .custom_path
-                    .clone()
-                    .unwrap_or_else(|| "ioc_output".to_string());
-
-                let format = app.output_format.clone();
-                let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
-                let mut overwrite_conflict = false;
-
-                let mut all_urls: Vec<(String, String)> = Vec::new();
-                for &ioc_type in &selected_types {
-                    let urls = get_urls_for_ioc_type(ioc_type);
-                    for url in urls {
-                        all_urls.push((url.to_string(), ioc_type.to_string()));
-                    }
-                }
-
-                app.overwrite_queue.clear();
-                for (url, ioc_type) in &all_urls {
-                    let ext = match format {
-                        OutputFormat::Txt => "txt",
-                        OutputFormat::Csv => "csv",
-                    };
-                    let filename = format!("{}-{}.{}", ioc_type.to_lowercase(), date_str, ext);
-                    let path = Path::new(&output_path).join(filename);
-                    if path.exists() {
-                        overwrite_conflict = true;
-                        app.overwrite_queue.push((url.clone(), ioc_type.clone()));
-                    }
-                }
-
-                if overwrite_conflict {
-                    app.pending_urls = Some(all_urls);
-                    app.confirm_overwrite = true;
-                } else {
-                    start_download(
-                        all_urls,
-                        format,
-                        output_path,
-                        Arc::clone(&app.progress),
-                        ctx.clone(),
-                    );
-                }
-            }
-
-            ui.separator();
-        }
-
-        if ui.button("⬅ Back to Menu").clicked() {
-            back_to_menu();
-        }
-    });
+        });
 }
 
 fn get_urls_for_ioc_type(ioc_type: &str) -> Vec<&'static str> {

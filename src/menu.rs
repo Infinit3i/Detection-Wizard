@@ -1,7 +1,7 @@
-// src/menu.rs
-
 use crate::{app::ToolSelectorApp, ioc_menu::IOCSelectorApp, ui, ui_ioc};
 use eframe::{egui, App, Frame};
+use egui::Margin;
+
 
 pub enum Screen {
     Menu,
@@ -43,23 +43,28 @@ impl App for MainApp {
             }
 
             Screen::Menu => {
-                egui::CentralPanel::default().show(ctx, |ui| {
-                    ui.heading("🔧 Detection Wizard");
-                    ui.separator();
-                    ui.label("Choose a toolset to begin:");
+                egui::CentralPanel::default()
+                    .frame(
+                        egui::Frame::default()
+                            .inner_margin(Margin::same(30.0)).outer_margin(Margin::same(20.0)),
+                    )
+                    .show(ctx, |ui| {
+                        ui.heading("🔧 Detection Wizard");
+                        ui.separator();
+                        ui.label("Choose a toolset to begin:");
 
-                    if ui.button("🛠 Rules").clicked() {
-                        new_screen = Some(Screen::ToolSelector(Default::default()));
-                    }
+                        if ui.button("🛠 Rules").clicked() {
+                            new_screen = Some(Screen::ToolSelector(Default::default()));
+                        }
 
-                    if ui.button("📥 IOC Downloader").clicked() {
-                        new_screen = Some(Screen::IOCDownloader(Default::default()));
-                    }
+                        if ui.button("📥 IOC Downloader").clicked() {
+                            new_screen = Some(Screen::IOCDownloader(Default::default()));
+                        }
 
-                    if ui.button("❌ Quit").clicked() {
-                        std::process::exit(0);
-                    }
-                });
+                        if ui.button("❌ Quit").clicked() {
+                            std::process::exit(0);
+                        }
+                    });
             }
         }
 

@@ -24,11 +24,11 @@ pub enum OutputFormat {
 impl Default for IOCSelectorApp {
     fn default() -> Self {
         Self {
-            selected: vec![false; 9],
             ioc_types: vec![
-                "Filename", "SHA256", "SHA1", "MD5", "IP",
-                "Domain", "URL", "Email", "Registry"
+                "Filename", "SHA256", "SHA1", "MD5", "IP", "Domain", "URL", "Email", "Registry",
+                "All",
             ],
+            selected: vec![false; 10],
             progress: Arc::new(Mutex::new(None)),
             output_format: OutputFormat::Txt,
             custom_path: None,
