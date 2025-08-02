@@ -1,6 +1,6 @@
 # Detection-Wizard 🧙‍♂️🔍
 
-**Detection-Wizard** is a powerful, command-line tool that consolidates detection rules from multiple sources into a single central repository. Whether you're working with **YARA**, **Suricata**, **Sigma**, or **Splunk**, Detection-Wizard makes it easy to pull and manage rule sets from various public repositories and resources.
+**Detection-Wizard** is a powerful, GUI tool that consolidates detection rules from multiple sources into a single central repository. Whether you're working with **YARA**, **Suricata**, **Sigma**, or **Splunk**. IOCs have also been added so you can manage your infastructure before and **after** and attack and see your security posture.
 
 ## Features ✨
 
@@ -29,24 +29,13 @@
 
 ### Setup
 
-1. **Clone the Repository:**
+#### Windows
 
-   ```bash
-   git clone https://github.com/infinit3i/Detection-Wizard.git
-   cd Detection-Wizard
-   ```
+[detection-wizard.exe](https://github.com/Infinit3i/Detection-Wizard/releases/download/1.0.0/detection-wizard.exe)
 
-2. **Build the Project:**
+#### Linux
 
-   ```bash
-   cargo build --release
-   ```
-
-3. **Run the Tool:**
-
-   ```bash
-   cargo run --release
-   ```
+[detection-wizard.elf](https://github.com/Infinit3i/Detection-Wizard/releases/download/1.0.0/detection-wizard.elf)
 
 ## Contributing 🤝
 
