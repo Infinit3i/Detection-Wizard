@@ -17,17 +17,6 @@
   - [awesome-suricata](https://github.com/satta/awesome-suricata) 🔗
   - Plus, many additional GitHub and web-based resources. 🌍
 
-
-### Setup
-
-#### Windows
-
-[detection-wizard.exe](https://github.com/Infinit3i/Detection-Wizard/releases/download/1.0.0/detection-wizard.exe)
-
-#### Linux
-
-[detection-wizard.elf](https://github.com/Infinit3i/Detection-Wizard/releases/download/1.0.0/detection-wizard.elf)
-
 ## Contributing 🤝
 
 Contributions are welcome! Whether you have suggestions for new sources, improvements in parsing logic, or additional features, please feel free to open an issue or submit a pull request. 💡
