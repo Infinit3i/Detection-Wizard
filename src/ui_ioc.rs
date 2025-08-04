@@ -232,6 +232,7 @@ pub fn render_ui_ioc(
                         "https://github.com/RedDrip7/APT_Digital_Weapon.git",
                         "https://github.com/sophoslabs/IoCs.git",
                         "https://github.com/StrangerealIntel/DailyIOC.git",
+                        "https://github.com/Infinit3i/IOC-Detections.git",
                     ];
 
                     let selected_types = app
