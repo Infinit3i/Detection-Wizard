@@ -4,7 +4,7 @@
 
 <p align="center">
   <br><br>
-    <a title="Hits" target="_blank" href="https://github.com/infinit3i/detection-wizard"><img src="https://hits.b3log.org/infinit3i/detection-wizard.svg"></a>
+    <a title="Hits" target="_blank" href="https://github.com/infinit3i/Detection-Wizard"><img src="https://hits.b3log.org/infinit3i/Detection-Wizard.svg"></a>
     <a title="Twitter" target="_blank" href="https://x.com/infinit3i"><img alt="Twitter Follow" src="https://img.shields.io/twitter/follow/b3logos?label=Follow&style=social"></a>
 </p>
 
