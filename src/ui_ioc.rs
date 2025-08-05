@@ -11,69 +11,6 @@ use std::path::Path;
 use std::sync::Arc;
 use walkdir::WalkDir;
 
-fn fetch_and_append_to_file(
-    url: &str,
-    ioc_type: &str,
-    format: &OutputFormat,
-    base_path: &str,
-    mut progress_callback: Option<&mut dyn FnMut()>,
-) {
-    let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
-
-    // Correct extension
-    let extension = match format {
-        OutputFormat::Txt => "txt",
-        OutputFormat::Csv => "csv",
-    };
-
-    // Correct output filename and path
-    let filename = format!("{}-{}.{}", ioc_type.to_lowercase(), date_str, extension);
-    let out_path = Path::new(base_path).join(filename);
-
-    // Ensure output directory exists
-    if let Some(parent) = out_path.parent() {
-        if let Err(e) = fs::create_dir_all(parent) {
-            eprintln!("❌ Failed to create directory {}: {}", parent.display(), e);
-            return;
-        }
-    }
-
-    // Download content
-    match reqwest::blocking::get(url) {
-        Ok(response) => match response.text() {
-            Ok(text) => {
-                let mut existing = String::new();
-                if out_path.exists() {
-                    if let Ok(existing_text) = fs::read_to_string(&out_path) {
-                        existing = existing_text;
-                    }
-                }
-
-                let combined = match format {
-                    OutputFormat::Txt => format!("{}\n{}", existing.trim(), text.trim()),
-                    OutputFormat::Csv => {
-                        // Rough CSV concat — customize if needed
-                        format!("{},{}", existing.trim(), text.trim().replace('\n', ","))
-                    }
-                };
-
-                if let Err(e) = fs::write(&out_path, combined.as_bytes()) {
-                    eprintln!("❌ Failed to write to {}: {}", out_path.display(), e);
-                } else {
-                    println!("✅ Appended {} to {}", url, out_path.display());
-                }
-            }
-            Err(e) => eprintln!("❌ Failed to read content from {}: {}", url, e),
-        },
-        Err(e) => eprintln!("❌ Failed to fetch {}: {}", url, e),
-    }
-
-    // Progress callback
-    if let Some(cb) = progress_callback.as_mut() {
-        cb();
-    }
-}
-
 pub fn render_ui_ioc(
     app: &mut IOCSelectorApp,
     ctx: &egui::Context,
@@ -446,42 +383,5 @@ fn get_urls_for_ioc_type(ioc_type: &str) -> Vec<&'static str> {
         ],
         "Registry" => vec!["https://www.botvrij.eu/data/ioclist.regkey"],
         _ => vec![],
-    }
-}
-
-fn fetch(url: &str, mut progress_callback: Option<&mut dyn FnMut()>) {
-    let filename = match url {
-        "https://www.botvrij.eu/data/ioclist.filename" => "filename.txt",
-        "https://www.botvrij.eu/data/ioclist.sha256" => "sha256.txt",
-        "https://www.botvrij.eu/data/ioclist.sha1" => "sha1.txt",
-        "https://www.botvrij.eu/data/ioclist.md5" => "md5.txt",
-        "https://www.binarydefense.com/banlist.txt" => "ip1_binarydefense.txt",
-        "https://www.botvrij.eu/data/ioclist.ip-dst" => "ip2_botvrij.txt",
-        "https://cinsscore.com/list/ci-badguys.txt" => "ip3_cins.txt",
-        "https://www.botvrij.eu/data/ioclist.domain" => "domain.txt",
-        "https://www.botvrij.eu/data/ioclist.url" => "url.txt",
-        "https://www.botvrij.eu/data/ioclist.email-src" => "email.txt",
-        "https://www.botvrij.eu/data/ioclist.regkey" => "registry.txt",
-        _ => "unknown.txt",
-    };
-
-    let out_dir = Path::new("ioc_output");
-    let out_path = out_dir.join(filename);
-
-    fs::create_dir_all(out_dir).unwrap();
-
-    match reqwest::blocking::get(url) {
-        Ok(response) => match response.text() {
-            Ok(text) => {
-                fs::write(&out_path, text.as_bytes()).unwrap();
-                println!("✅ Saved {} to {}", filename, out_path.display());
-            }
-            Err(e) => println!("Failed to read text from {}: {}", url, e),
-        },
-        Err(e) => println!("Failed to fetch from {}: {}", url, e),
-    }
-    println!("✅ Saved {} to {}", filename, out_path.display());
-    if let Some(cb) = progress_callback.as_mut() {
-        cb();
     }
 }

@@ -7,7 +7,7 @@ use reqwest::blocking as reqwest;
 
 /// Process Splunk rules by cloning a base Splunk repository (if available),
 /// and then processing additional sources for Splunk rule content.
-pub fn process_splunk(mut progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
+pub fn process_splunk(progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
     println!("Processing Splunk rules...");
 
     // Optionally, process a base Splunk rules repository.

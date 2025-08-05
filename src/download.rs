@@ -1,16 +1,72 @@
 use chrono::Local;
 use eframe::egui::Context;
 use egui::Color32;
+use std::path::PathBuf;
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use indicatif::{ProgressBar, ProgressStyle};
 use std::thread;
 use eframe::egui;
+use reqwest::blocking::get;
+use std::io;
+use tempfile::tempdir;
+use walkdir::WalkDir;
 
 #[derive(Clone)]
 pub enum DownloadFormat {
     Txt,
     Csv,
+}
+
+pub fn download_files_with_progress(
+    urls: &[&str],
+    output_path: &PathBuf,
+    label: &str,
+    extension_filter: Option<&str>,
+) {
+    let pb = ProgressBar::new(urls.len() as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("##-"),
+    );
+
+    for url in urls {
+        let file_name = url.split('/').last().unwrap_or("downloaded.rules");
+        pb.set_message(format!("{}: {}", label, file_name));
+
+        if let Some(ext) = extension_filter {
+            if !file_name.ends_with(ext) {
+                pb.inc(1);
+                continue;
+            }
+        }
+
+        match get(*url) {
+            Ok(resp) if resp.status().is_success() => {
+                if let Ok(text) = resp.text() {
+                    let dest_path = output_path.join(file_name);
+                    if let Err(e) = fs::write(&dest_path, text) {
+                        eprintln!("Failed to write {}: {}", dest_path.display(), e);
+                    }
+                } else {
+                    eprintln!("Failed to read response text from: {}", url);
+                }
+            }
+            Ok(resp) => {
+                eprintln!("HTTP error for {}: {}", url, resp.status());
+            }
+            Err(e) => {
+                eprintln!("Request error for {}: {}", url, e);
+            }
+        }
+
+        pb.inc(1);
+    }
+
+    pb.finish_with_message(format!("Finished downloading {} rules", label));
 }
 
 pub fn start_download(
@@ -124,5 +180,47 @@ pub fn render_output_path_selector(
     } else {
         ui.label(format!("Save path: {} (default)", default_path));
     }
+}
+
+pub fn download_and_extract_git_repo(
+
+    repo_url: &str,
+    output_path: &Path,
+    extension: Option<&str>,
+) -> io::Result<()> {
+    let tmp_dir = tempdir()?;
+    let tmp_path = tmp_dir.path();
+
+    git2::Repository::clone(repo_url, tmp_path)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.message()))?;
+
+    for entry in WalkDir::new(tmp_path) {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_file() {
+            if let Some(ext) = extension {
+                if !path.extension().and_then(|e| e.to_str()).map_or(false, |e| e.ends_with(&ext[1..])) {
+                    continue;
+                }
+            }
+
+            let filename = path.file_name().unwrap_or_default();
+            let dest = output_path.join(filename);
+            fs::copy(path, dest)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn clone_git_repo_to_temp(repo_url: &str) -> io::Result<PathBuf> {
+    let tmp_dir = tempdir()?;
+    let tmp_path = tmp_dir.into_path(); // persist it beyond tempdir's scope
+
+    git2::Repository::clone(repo_url, &tmp_path)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.message()))?;
+
+    Ok(tmp_path)
 }
 

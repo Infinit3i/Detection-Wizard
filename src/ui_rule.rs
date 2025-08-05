@@ -21,16 +21,28 @@ pub fn load_icon(path: &str) -> Option<IconData> {
 fn run_tool_with_progress<F>(
     ctx: egui::Context,
     progress: Arc<Mutex<Option<(usize, usize)>>>,
+    current_file: Arc<Mutex<Option<String>>>,
+    cancel_flag: Arc<Mutex<bool>>, // ← ADD
     mut tool_fn: F,
 ) where
-    F: FnMut(&mut dyn FnMut(usize, usize)) + Send + 'static,
+    F: FnMut(&mut dyn FnMut(usize, usize, String) -> bool) + Send + 'static, // ← returns bool now
 {
     thread::spawn(move || {
-        let mut update_progress = |current: usize, total: usize| {
-            if let Ok(mut guard) = progress.lock() {
-                *guard = Some((current, total));
+        let mut update_progress = |current: usize, total: usize, file: String| -> bool {
+            if let Ok(cancelled) = cancel_flag.lock() {
+                if *cancelled {
+                    return false;
+                }
+            }
+
+            if let Ok(mut p) = progress.lock() {
+                *p = Some((current, total));
+            }
+            if let Ok(mut f) = current_file.lock() {
+                *f = Some(file);
             }
             ctx.request_repaint();
+            true
         };
 
         tool_fn(&mut update_progress);
@@ -52,11 +64,19 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     let percent = (current as f32 / total as f32) * 100.0;
                     ui.label(format!("Progress: {}/{} ({:.0}%)", current, total, percent));
                     ui.add(egui::ProgressBar::new(percent / 100.0).show_percentage());
+                    if let Ok(f) = app.current_file.lock() {
+                        if let Some(name) = &*f {
+                            ui.label(format!("Currently processing: {}", name));
+                        }
+                    }
 
                     if current >= total {
                         *guard = None; // Reset progress after completion
                     } else {
                         return; // Don't show selection UI while running
+                    }
+                    if let Ok(mut cancel) = app.cancel_flag.lock() {
+                        *cancel = true; // Signal to cancel all remaining downloads
                     }
                 }
             }
@@ -66,7 +86,6 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 ui.heading("Select tools to run:");
 
                 for (i, name) in app.tool_names.iter().enumerate() {
-                    let was_checked = app.selected[i];
                     let checkbox = ui.checkbox(&mut app.selected[i], *name);
 
                     if checkbox.clicked() {
@@ -107,68 +126,86 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 if ui.button("Run Selected").clicked() {
                     let ctx = ctx.clone();
                     let progress = Arc::clone(&app.progress);
+                    let current_file = Arc::clone(&app.current_file);
 
-                    if app.selected[4] {
-                        let out_path = app
-                            .custom_path
-                            .clone()
-                            .unwrap_or_else(|| "./rule_output/suricata".to_string());
+                    let selected_tools = ["Yara", "Suricata", "Sigma", "Splunk"];
 
-                        let yara_path = format!(
-                            "{}/yara",
-                            app.custom_path
-                                .clone()
-                                .unwrap_or_else(|| "./rule_output".to_string())
-                        );
-                        let suricata_path = yara_path.clone();
+                    for (i, &tool) in selected_tools.iter().enumerate() {
+                        if app.selected[i] || app.selected[4] {
+                            let ctx = ctx.clone();
+                            let progress = Arc::clone(&progress);
+                            let current_file = Arc::clone(&current_file);
+                            let custom_path = app.custom_path.clone();
+                            let cancel_flag = Arc::clone(&app.cancel_flag);
 
-                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), move |cb| {
-                            yara::process_yara(&yara_path, Some(cb));
-                        });
-                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), move |cb| {
-                            suricata::process_suricata(&suricata_path, Some(cb));
-                        });
-
-                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
-                            sigma::process_sigma(Some(cb));
-                        });
-                        run_tool_with_progress(ctx.clone(), Arc::clone(&progress), |cb| {
-                            splunk::process_splunk(Some(cb));
-                        });
-                    } else {
-                        for (i, selected) in app.selected.iter().enumerate() {
-                            if *selected {
-                                let ctx = ctx.clone();
-                                let progress = Arc::clone(&progress);
-                                match app.tool_names[i] {
-                                    "Yara" => {
-                                        let out_path = format!(
-                                            "{}/yara",
-                                            app.custom_path
-                                                .clone()
-                                                .unwrap_or_else(|| "./rule_output".to_string())
-                                        );
-                                        run_tool_with_progress(ctx, progress, move |cb| {
-                                            yara::process_yara(&out_path, Some(cb));
-                                        })
-                                    }
-                                    "Sigma" => run_tool_with_progress(ctx, progress, |cb| {
-                                        sigma::process_sigma(Some(cb));
-                                    }),
-                                    "Suricata" => {
-                                        let out_path =
-                                            app.custom_path.clone().unwrap_or_else(|| {
-                                                "./rule_output/suricata".to_string()
-                                            });
-                                        run_tool_with_progress(ctx, progress, move |cb| {
-                                            suricata::process_suricata(&out_path, Some(cb));
-                                        });
-                                    }
-                                    "Splunk" => run_tool_with_progress(ctx, progress, |cb| {
-                                        splunk::process_splunk(Some(cb));
-                                    }),
-                                    _ => {}
+                            match tool {
+                                "Yara" => {
+                                    let out_path = format!(
+                                        "{}/yara",
+                                        custom_path.unwrap_or_else(|| "./rule_output".to_string())
+                                    );
+                                    run_tool_with_progress(
+                                        ctx,
+                                        progress,
+                                        current_file,
+                                        cancel_flag,
+                                        move |cb| {
+                                            yara::process_yara(
+                                                &out_path,
+                                                Some(&mut |cur, total, file| {
+                                                    cb(cur, total, file);
+                                                }),
+                                            );
+                                        },
+                                    );
                                 }
+                                "Suricata" => {
+                                    let out_path = custom_path
+                                        .clone()
+                                        .unwrap_or_else(|| "./rule_output/suricata".to_string());
+                                    run_tool_with_progress(
+                                        ctx,
+                                        progress,
+                                        current_file,
+                                        cancel_flag,
+                                        move |cb| {
+                                            suricata::process_suricata_rules(
+                                                vec![out_path.clone().into()],
+                                                out_path.clone().into(),
+                                                Some(&mut |cur, total, file| {
+                                                    cb(cur, total, file);
+                                                }),
+                                            );
+                                        },
+                                    );
+                                }
+                                "Sigma" => {
+                                    run_tool_with_progress(
+                                        ctx,
+                                        progress,
+                                        current_file,
+                                        cancel_flag,
+                                        |cb| {
+                                            sigma::process_sigma(Some(&mut |cur, total| {
+                                                cb(cur, total, "sigma".to_string());
+                                            }));
+                                        },
+                                    );
+                                }
+                                "Splunk" => {
+                                    run_tool_with_progress(
+                                        ctx,
+                                        progress,
+                                        current_file,
+                                        cancel_flag,
+                                        |cb| {
+                                            splunk::process_splunk(Some(&mut |cur, total| {
+                                                cb(cur, total, "splunk".to_string());
+                                            }));
+                                        },
+                                    );
+                                }
+                                _ => {}
                             }
                         }
                     }
@@ -183,7 +220,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     egui::Button::new(
                         egui::RichText::new("⬅ Back to Menu").color(egui::Color32::WHITE),
                     )
-                    .fill(egui::Color32::from_rgb(255, 140, 0)), // Orange
+                    .fill(egui::Color32::from_rgb(255, 140, 0)),
                 )
                 .clicked()
             {

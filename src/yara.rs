@@ -9,7 +9,7 @@ use walkdir::WalkDir;
 /// and then processing additional lists defined for GitHub repos and webpage sources.
 pub fn process_yara(
     output_path: &str,
-    mut progress_callback: Option<&mut dyn FnMut(usize, usize)>,
+    mut progress_callback: Option<&mut dyn FnMut(usize, usize, String)>,
 ) {
     println!("Processing YARA rules...");
 
@@ -91,7 +91,7 @@ pub fn process_yara(
     let total = yara_github_repos.len();
     for (index, repo_url) in yara_github_repos.iter().enumerate() {
         if let Some(cb) = progress_callback.as_mut() {
-            cb(index + 1, total);
+            cb(index + 1, total, repo_url.to_string());
         }
         println!("Processing YARA GitHub repository: {}", repo_url);
         if !repo_url.is_empty() {

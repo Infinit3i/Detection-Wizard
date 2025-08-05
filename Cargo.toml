@@ -17,6 +17,8 @@ egui = "0.27"
 image = "0.25"
 chrono = "0.4"
 rfd = "0.12"
+indicatif = "0.18.0"
+tempfile = "3.20.0"
 
 
 [profile.release]
