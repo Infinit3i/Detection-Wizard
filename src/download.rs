@@ -213,14 +213,3 @@ pub fn download_and_extract_git_repo(
 
     Ok(())
 }
-
-pub fn clone_git_repo_to_temp(repo_url: &str) -> io::Result<PathBuf> {
-    let tmp_dir = tempdir()?;
-    let tmp_path = tmp_dir.into_path(); // persist it beyond tempdir's scope
-
-    git2::Repository::clone(repo_url, &tmp_path)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.message()))?;
-
-    Ok(tmp_path)
-}
-

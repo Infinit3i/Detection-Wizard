@@ -17,7 +17,7 @@ pub fn splunk_web_sources() -> Vec<&'static str> {
     ]
 }
 
-pub fn process_splunk(progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
+pub fn process_splunk(_progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
     println!("Processing Splunk rules...");
 
     for repo in splunk_github_sources() {

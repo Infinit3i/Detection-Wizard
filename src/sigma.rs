@@ -20,7 +20,7 @@ pub fn sigma_web_sources() -> Vec<&'static str> {
 }
 
 /// Process Sigma rules by cloning a base Sigma repository, and then processing additional sources.
-pub fn process_sigma(progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
+pub fn process_sigma(_progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
     println!("Processing Sigma rules...");
 
     let repo_url = "https://github.com/SigmaHQ/sigma.git";

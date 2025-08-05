@@ -144,9 +144,6 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 ui.add_space(20.0);
                 if ui.button("Run Selected").clicked() {
                     let ctx = ctx.clone();
-                    let progress = Arc::clone(&app.progress);
-                    let current_file = Arc::clone(&app.current_file);
-                    let cancel_flag = Arc::clone(&app.cancel_flag);
                     let custom_path = app
                         .custom_path
                         .clone()
@@ -192,8 +189,8 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 "Yara" => {
                                     yara::process_yara(
                                         &out_path,
-                                        Some(&mut |cur, total, file| {
-                                            cb(cur, total_work, file); // use global total
+                                        Some(&mut |cur, _total, file| {
+                                            cb(cur, total_work, file);
                                         }),
                                     );
                                 }
@@ -201,8 +198,8 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                     suricata::process_suricata_rules(
                                         vec![out_path.clone().into()],
                                         out_path.clone().into(),
-                                        Some(&mut |cur, total, file| {
-                                            cb(cur, total_work, file); // use global total
+                                        Some(&mut |cur, _total, file| {
+                                            cb(cur, total_work, file);
                                         }),
                                     );
                                 }

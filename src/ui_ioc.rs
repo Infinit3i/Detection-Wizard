@@ -28,13 +28,13 @@ pub fn render_ui_ioc(
                     .collapsible(false)
                     .resizable(false)
                     .show(ctx, |ui| {
-                        let (url, ioc_type) = &app.overwrite_queue[app.overwrite_index];
+                        let (_url, ioc_type) = &app.overwrite_queue[app.overwrite_index];
                         let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
                         let ext = match app.output_format {
                             OutputFormat::Txt => "txt",
                             OutputFormat::Csv => "csv",
                         };
-                        let filename = format!("{}-{}.{}", ioc_type.to_lowercase(), date_str, ext);
+                        let _filename = format!("{}-{}.{}", ioc_type.to_lowercase(), date_str, ext);
 
                         ui.label("Some files already exist. What do you want to do?");
                         ui.horizontal(|ui| {
@@ -111,7 +111,7 @@ pub fn render_ui_ioc(
                 ui.heading("Select IOC types to download:");
 
                 for (i, name) in app.ioc_types.iter().enumerate() {
-                    let was_checked = app.selected[i];
+                    let _was_checked = app.selected[i];
                     let checkbox = ui.checkbox(&mut app.selected[i], *name);
 
                     if checkbox.clicked() {
@@ -258,7 +258,7 @@ pub fn render_ui_ioc(
         });
 }
 
-pub fn process_git_iocs(repo_url: &str, output_path: &str, selected_types: &[&str]) {
+pub fn process_git_iocs(repo_url: &str, output_path: &str, _selected_types: &[&str]) {
     let repo_name = repo_url
         .split('/')
         .last()
