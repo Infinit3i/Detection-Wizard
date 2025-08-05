@@ -5,38 +5,28 @@ use regex::Regex;
 use walkdir::WalkDir;
 use reqwest::blocking as reqwest;
 
-/// Process Splunk rules by cloning a base Splunk repository (if available),
-/// and then processing additional sources for Splunk rule content.
+pub fn splunk_github_sources() -> Vec<&'static str> {
+    vec![
+        "https://github.com/Infinit3i/Defensive-Rules.git",
+    ]
+}
+
+pub fn splunk_web_sources() -> Vec<&'static str> {
+    vec![
+        "",
+    ]
+}
+
 pub fn process_splunk(progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
     println!("Processing Splunk rules...");
 
-    // Optionally, process a base Splunk rules repository.
-    let base_repo_url = "https://github.com/example/splunk-rules.git"; // update with a real URL if available
-    let splunk_repo_path = "./splunk-rules";
-    println!("Cloning base Splunk repository from {}...", base_repo_url);
-    if let Err(e) = Repository::clone(base_repo_url, splunk_repo_path) {
-        eprintln!("Failed to clone splunk repo {}: {}", base_repo_url, e);
-    } else {
-        copy_splunk_rule_files(splunk_repo_path, "./splunk");
-    }
-
-    // Additional Splunk GitHub repositories.
-    let splunk_github_repos = vec![
-        "https://github.com/example/splunk-rules-1.git",
-        "https://github.com/example/splunk-rules-2.git",
-    ];
-    for repo in splunk_github_repos {
+    for repo in splunk_github_sources() {
         if !repo.is_empty() {
             process_splunk_github_repo(repo);
         }
     }
 
-    // Additional Splunk webpage sources.
-    let splunk_webpage_sources = vec![
-        "https://example.com/splunk/rules_page.html",
-        "https://raw.githubusercontent.com/example/splunk/main/detections.conf",
-    ];
-    for page in splunk_webpage_sources {
+    for page in splunk_web_sources() {
         if !page.is_empty() {
             process_splunk_webpage_source(page);
         }
@@ -55,11 +45,11 @@ fn process_splunk_github_repo(repo_url: &str) {
 }
 
 /// Process an additional Splunk webpage source.
-/// If the URL ends with .conf, .xml, or .spl, download it as a rule file;
+/// If the URL ends with .conf, .xml, .md or .spl, download it as a rule file;
 /// otherwise treat it as an HTML page and extract further links.
 fn process_splunk_webpage_source(url: &str) {
     println!("Processing Splunk webpage source: {}", url);
-    if url.ends_with(".conf") || url.ends_with(".xml") || url.ends_with(".spl") {
+    if url.ends_with(".conf") || url.ends_with(".xml") || url.ends_with(".md") || url.ends_with(".spl") {
         let response = reqwest::get(url);
         match response {
             Ok(resp) => {
@@ -165,4 +155,8 @@ fn copy_splunk_rule_files(src_dir: &str, dest_dir: &str) {
             }
         }
     }
+}
+
+pub fn splunk_total_sources() -> usize {
+    1 + splunk_github_sources().len() + splunk_web_sources().iter().filter(|s| !s.is_empty()).count()
 }

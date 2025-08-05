@@ -153,8 +153,8 @@ pub fn render_ui_ioc(
                 ui.separator();
                 ui.add_space(10.0);
                 render_output_path_selector(ui, &mut app.custom_path, "./ioc_output");
-                ui.add_space(10.0);
-                ui.separator();
+                
+                ui.add_space(20.0);
                 if ui.button("Run Selected").clicked() {
                     let git_repos = vec![
                         "https://github.com/avast/ioc.git",
@@ -239,17 +239,17 @@ pub fn render_ui_ioc(
                         );
                     }
                 }
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(10.0);
             }
 
+            ui.add_space(30.0);
+            ui.separator();
+            ui.add_space(40.0);
             if ui
                 .add(
                     egui::Button::new(
                         egui::RichText::new("⬅ Back to Menu").color(egui::Color32::WHITE),
                     )
-                    .fill(egui::Color32::from_rgb(255, 140, 0)), // Orange
+                    .fill(egui::Color32::from_rgb(255, 140, 0)),
                 )
                 .clicked()
             {

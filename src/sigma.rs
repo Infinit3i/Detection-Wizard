@@ -5,11 +5,24 @@ use regex::Regex;
 use walkdir::WalkDir;
 use reqwest::blocking as reqwest;
 
+pub fn sigma_github_sources() -> Vec<&'static str> {
+    vec![
+        "https://github.com/example/sigma-rules-1.git",
+        "https://github.com/example/sigma-rules-2.git",
+    ]
+}
+
+pub fn sigma_web_sources() -> Vec<&'static str> {
+    vec![
+        "https://example.com/sigma/rules_page.html",
+        "https://raw.githubusercontent.com/example/sigma/main/sample.yml",
+    ]
+}
+
 /// Process Sigma rules by cloning a base Sigma repository, and then processing additional sources.
 pub fn process_sigma(progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
     println!("Processing Sigma rules...");
 
-    // Base Sigma repository (for example, the official sigma repository).
     let repo_url = "https://github.com/SigmaHQ/sigma.git";
     let sigma_repo_path = "./sigma";
     println!("Cloning Sigma repository from {}...", repo_url);
@@ -19,30 +32,19 @@ pub fn process_sigma(progress_callback: Option<&mut dyn FnMut(usize, usize)>) {
         copy_sigma_rule_files(sigma_repo_path, "./sigma");
     }
 
-    // Additional Sigma GitHub repositories.
-    let sigma_github_repos = vec![
-        // Add additional Sigma GitHub repository URLs here.
-        "https://github.com/example/sigma-rules-1.git",
-        "https://github.com/example/sigma-rules-2.git",
-    ];
-    for repo_url in sigma_github_repos {
+    for repo_url in sigma_github_sources() {
         if !repo_url.is_empty() {
             process_sigma_github_repo(repo_url);
         }
     }
 
-    // Additional Sigma webpage sources.
-    let sigma_webpage_sources = vec![
-        // Add additional Sigma webpage URLs here.
-        "https://example.com/sigma/rules_page.html",
-        "https://raw.githubusercontent.com/example/sigma/main/sample.yml",
-    ];
-    for page_url in sigma_webpage_sources {
+    for page_url in sigma_web_sources() {
         if !page_url.is_empty() {
             process_sigma_webpage_source(page_url);
         }
     }
 }
+
 
 /// Process an additional Sigma GitHub repository.
 fn process_sigma_github_repo(repo_url: &str) {
@@ -165,4 +167,8 @@ fn copy_sigma_rule_files(src_dir: &str, dest_dir: &str) {
             }
         }
     }
+}
+
+pub fn sigma_total_sources() -> usize {
+    1 + sigma_github_sources().len() + sigma_web_sources().iter().filter(|s| !s.is_empty()).count()
 }

@@ -71,12 +71,31 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     }
 
                     if current >= total {
-                        *guard = None; // Reset progress after completion
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(20.0);
+                            ui.heading(egui::RichText::new("✅ COMPLETE ✅").size(60.0));
+                            ui.add_space(20.0);
+                            if ui
+                                .add(
+                                    egui::Button::new(
+                                        egui::RichText::new("Done")
+                                            .size(24.0)
+                                            .color(egui::Color32::WHITE),
+                                    )
+                                    .fill(egui::Color32::from_rgb(0, 128, 0)),
+                                )
+                                .clicked()
+                            {
+                                *guard = None;
+                                if let Ok(mut cancel) = app.cancel_flag.lock() {
+                                    *cancel = true;
+                                }
+                            }
+                        });
+
+                        return;
                     } else {
-                        return; // Don't show selection UI while running
-                    }
-                    if let Ok(mut cancel) = app.cancel_flag.lock() {
-                        *cancel = true; // Signal to cancel all remaining downloads
+                        return;
                     }
                 }
             }
@@ -122,99 +141,91 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 ui.add_space(10.0);
                 render_output_path_selector(ui, &mut app.custom_path, "./rule_output");
 
-                ui.add_space(10.0);
+                ui.add_space(20.0);
                 if ui.button("Run Selected").clicked() {
                     let ctx = ctx.clone();
                     let progress = Arc::clone(&app.progress);
                     let current_file = Arc::clone(&app.current_file);
+                    let cancel_flag = Arc::clone(&app.cancel_flag);
+                    let custom_path = app
+                        .custom_path
+                        .clone()
+                        .unwrap_or_else(|| "./rule_output".to_string());
+                    let selected_tools: Vec<&str> = ["Yara", "Suricata", "Sigma", "Splunk"]
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.selected[*i] || app.selected[4])
+                        .map(|(_, &tool)| tool)
+                        .collect();
 
-                    let selected_tools = ["Yara", "Suricata", "Sigma", "Splunk"];
+                    // Estimate total work by summing counts for selected tools
+                    let mut total_work = 0;
+                    for &tool in &selected_tools {
+                        match tool {
+                            "Yara" => total_work += yara::yara_total_sources(),
+                            "Suricata" => total_work += suricata::suricata_total_sources(),
+                            "Sigma" => total_work += sigma::sigma_total_sources(),
+                            "Splunk" => total_work += splunk::splunk_total_sources(),
+                            _ => {}
+                        }
+                    }
 
-                    for (i, &tool) in selected_tools.iter().enumerate() {
-                        if app.selected[i] || app.selected[4] {
-                            let ctx = ctx.clone();
-                            let progress = Arc::clone(&progress);
-                            let current_file = Arc::clone(&current_file);
-                            let custom_path = app.custom_path.clone();
-                            let cancel_flag = Arc::clone(&app.cancel_flag);
+                    // Reset progress state
+                    if let Ok(mut p) = app.progress.lock() {
+                        *p = Some((0, total_work));
+                    }
 
-                            match tool {
+                    // Then spawn each tool in parallel
+                    for tool in selected_tools {
+                        let ctx = ctx.clone();
+                        let progress = Arc::clone(&app.progress);
+                        let current_file = Arc::clone(&app.current_file);
+                        let cancel_flag = Arc::new(Mutex::new(false));
+                        let out_path = format!("{}/{}", custom_path, tool.to_lowercase());
+
+                        run_tool_with_progress(
+                            ctx,
+                            Arc::clone(&progress),
+                            Arc::clone(&current_file),
+                            Arc::clone(&cancel_flag),
+                            move |cb| match tool {
                                 "Yara" => {
-                                    let out_path = format!(
-                                        "{}/yara",
-                                        custom_path.unwrap_or_else(|| "./rule_output".to_string())
-                                    );
-                                    run_tool_with_progress(
-                                        ctx,
-                                        progress,
-                                        current_file,
-                                        cancel_flag,
-                                        move |cb| {
-                                            yara::process_yara(
-                                                &out_path,
-                                                Some(&mut |cur, total, file| {
-                                                    cb(cur, total, file);
-                                                }),
-                                            );
-                                        },
+                                    yara::process_yara(
+                                        &out_path,
+                                        Some(&mut |cur, total, file| {
+                                            cb(cur, total_work, file); // use global total
+                                        }),
                                     );
                                 }
                                 "Suricata" => {
-                                    let out_path = custom_path
-                                        .clone()
-                                        .unwrap_or_else(|| "./rule_output/suricata".to_string());
-                                    run_tool_with_progress(
-                                        ctx,
-                                        progress,
-                                        current_file,
-                                        cancel_flag,
-                                        move |cb| {
-                                            suricata::process_suricata_rules(
-                                                vec![out_path.clone().into()],
-                                                out_path.clone().into(),
-                                                Some(&mut |cur, total, file| {
-                                                    cb(cur, total, file);
-                                                }),
-                                            );
-                                        },
+                                    suricata::process_suricata_rules(
+                                        vec![out_path.clone().into()],
+                                        out_path.clone().into(),
+                                        Some(&mut |cur, total, file| {
+                                            cb(cur, total_work, file); // use global total
+                                        }),
                                     );
                                 }
                                 "Sigma" => {
-                                    run_tool_with_progress(
-                                        ctx,
-                                        progress,
-                                        current_file,
-                                        cancel_flag,
-                                        |cb| {
-                                            sigma::process_sigma(Some(&mut |cur, total| {
-                                                cb(cur, total, "sigma".to_string());
-                                            }));
-                                        },
-                                    );
+                                    sigma::process_sigma(Some(&mut |cur, _| {
+                                        cb(cur, total_work, "sigma".to_string());
+                                    }));
                                 }
                                 "Splunk" => {
-                                    run_tool_with_progress(
-                                        ctx,
-                                        progress,
-                                        current_file,
-                                        cancel_flag,
-                                        |cb| {
-                                            splunk::process_splunk(Some(&mut |cur, total| {
-                                                cb(cur, total, "splunk".to_string());
-                                            }));
-                                        },
-                                    );
+                                    splunk::process_splunk(Some(&mut |cur, _| {
+                                        cb(cur, total_work, "splunk".to_string());
+                                    }));
                                 }
                                 _ => {}
-                            }
-                        }
+                            },
+                        );
                     }
                 }
             }
 
-            ui.add_space(10.0);
+            ui.add_space(30.0);
             ui.separator();
-            ui.add_space(10.0);
+            ui.add_space(40.0);
             if ui
                 .add(
                     egui::Button::new(
@@ -225,7 +236,6 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 .clicked()
             {
                 back_to_menu();
-                return;
             }
         });
 }
