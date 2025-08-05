@@ -1,4 +1,4 @@
-// src/main.rs
+#![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod rule_menu;
 mod ioc_menu;

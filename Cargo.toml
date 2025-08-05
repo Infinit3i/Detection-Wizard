@@ -26,3 +26,6 @@ strip = "symbols"
 
 [package.metadata.windows]
 subsystem = "windows"
+
+[package.metadata.winres]
+windows_subsystem = "windows"
