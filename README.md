@@ -17,7 +17,10 @@
   - **YARA**: Rule sets for malware and threat detection. 🦠
   - **Suricata**: IDS/IPS rules for network security. 🌐
   - **Sigma**: Generic signatures that can be converted to various SIEM formats. 📊
-  - **Splunk**: Detection configurations for Splunk environments. 📈
+ 
+  - SIEMS
+    - **Splunk**: Detection configurations for Splunk environments. 📈
+    - **QRadar**: Detections for IBM QRadar SIEM
 
 - **Automated Repository Pulling:**  
   Clone and update rule repositories automatically from curated sources, including:
