@@ -20,13 +20,6 @@ pub fn suricata_web_sources() -> Vec<&'static str> {
         "https://security.etnetera.cz/feeds/etn_aggressive.rules",
         "https://raw.githubusercontent.com/travisbgreen/hunting-rules/master/hunting.rules",
         "https://rules.emergingthreats.net/open/suricata/rules/",
-    ]
-}
-
-pub fn suricata_github_repos() -> Vec<&'static str> {
-    vec![
-        "https://github.com/ptresearch/AttackDetection.git",
-        "https://github.com/beave/sagan-rules.git",
         "https://openinfosecfoundation.org/rules/trafficid/trafficid.rules",
         "https://rules.emergingthreats.net/blockrules/emerging-compromised.rules",
         "https://rules.emergingthreats.net/blockrules/emerging-dshield.suricata.rules",
@@ -36,9 +29,24 @@ pub fn suricata_github_repos() -> Vec<&'static str> {
         "https://rules.emergingthreats.net/blockrules/threatview_CS_c2.suricata.rules",
         "https://rules.emergingthreats.net/blockrules/emerging-tor.suricata.rules",
         "https://sslbl.abuse.ch/blacklist/sslblacklist.rules",
-        "https://sslbl.abuse.ch/blacklist/sslblacklist_tls_cert.rules",
-        "https://sslbl.abuse.ch/blacklist/ja3_fingerprints.rules",
         "https://urlhaus.abuse.ch/downloads/ids/",
+        "https://networkforensic.dk/SNORT/NF-local.zip",
+        "https://networkforensic.dk/SNORT/NF-SCADA.zip",
+        "https://networkforensic.dk/SNORT/NF-Scanners.zip",
+    ]
+}
+
+pub fn suricata_github_repos() -> Vec<&'static str> {
+    vec![
+        "https://github.com/ptresearch/AttackDetection.git",
+        "https://github.com/beave/sagan-rules.git",
+        "https://github.com/klingerko/nids-rule-library.git",
+        "https://github.com/quadrantsec/suricata-rules.git",
+        "https://github.com/Cluster25/detection.git",
+        "https://github.com/fox-it/quantuminsert.git",
+        "https://github.com/travisbgreen/hunting-rules.git",
+        "https://github.com/aleksibovellan/opnsense-suricata-nmaps.git",
+        "https://github.com/julioliraup/Antiphishing.git",
     ]
 }
 

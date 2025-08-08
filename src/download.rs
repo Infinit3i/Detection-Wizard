@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use indicatif::{ProgressBar, ProgressStyle};
 use std::thread;
 use eframe::egui;
 use reqwest::blocking::get;
@@ -22,24 +21,14 @@ pub enum DownloadFormat {
 pub fn download_files_with_progress(
     urls: &[&str],
     output_path: &PathBuf,
-    label: &str,
+    _label: &str,
     extension_filter: Option<&str>,
 ) {
-    let pb = ProgressBar::new(urls.len() as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-            .unwrap()
-            .progress_chars("##-"),
-    );
-
     for url in urls {
         let file_name = url.split('/').last().unwrap_or("downloaded.rules");
-        pb.set_message(format!("{}: {}", label, file_name));
 
         if let Some(ext) = extension_filter {
             if !file_name.ends_with(ext) {
-                pb.inc(1);
                 continue;
             }
         }
@@ -62,11 +51,7 @@ pub fn download_files_with_progress(
                 eprintln!("Request error for {}: {}", url, e);
             }
         }
-
-        pb.inc(1);
     }
-
-    pb.finish_with_message(format!("Finished downloading {} rules", label));
 }
 
 pub fn start_download(
@@ -140,8 +125,6 @@ pub fn fetch_and_append_to_file(
 
                 if let Err(e) = fs::write(&out_path, combined.as_bytes()) {
                     eprintln!("❌ Failed to write to {}: {}", out_path.display(), e);
-                } else {
-                    println!("✅ Appended {} to {}", url, out_path.display());
                 }
             }
             Err(e) => eprintln!("❌ Failed to read content from {}: {}", url, e),
@@ -183,7 +166,6 @@ pub fn render_output_path_selector(
 }
 
 pub fn download_and_extract_git_repo(
-
     repo_url: &str,
     output_path: &Path,
     extension: Option<&str>,

@@ -127,7 +127,7 @@ fn extract_repo_name(repo_url: &str) -> String {
             .to_string()
 }
 
-/// Recursively search for QRadar rule files (.xml, .json, .rules, .aql) in `src_dir`
+/// Recursively search for QRadar rule files (.xml, .json, .aql, .txt) in `src_dir`
 /// and copy them into `dest_dir`.
 fn copy_qradar_rule_files(src_dir: &str, dest_dir: &str) {
     if let Err(e) = fs::create_dir_all(dest_dir) {
@@ -145,7 +145,7 @@ fn copy_qradar_rule_files(src_dir: &str, dest_dir: &str) {
         if entry.file_type().is_file() {
             let path = entry.path();
             if let Some(ext) = path.extension() {
-                if ext == "xml" || ext == "json" || ext == "rules" || ext == "aql" {
+                if ext == "xml" || ext == "json" || ext == "aql" || ext == "txt" {
                     let file_name = path.file_name().unwrap();
                     let dest_path = Path::new(dest_dir).join(file_name);
                     if let Err(e) = fs::copy(path, &dest_path) {
