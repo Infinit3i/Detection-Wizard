@@ -18,8 +18,6 @@ pub fn process_yara(
     output_path: &str,
     mut progress_callback: Option<&mut dyn FnMut(usize, usize, String)>,
 ) {
-    println!("Processing YARA rules...");
-
     // Process the awesome-yara repository.
     process_awesome_yara(output_path);
 
@@ -29,7 +27,6 @@ pub fn process_yara(
         if let Some(cb) = progress_callback.as_mut() {
             cb(index + 1, total, repo_url.to_string());
         }
-        println!("Processing YARA GitHub repository: {}", repo_url);
         if !repo_url.is_empty() {
             process_yara_github_repo(repo_url, output_path);
         }
@@ -69,11 +66,9 @@ fn process_awesome_yara(output_path: &str) {
 
     // Extract rule links between the '## Rules' and '## Tools' sections.
     let rule_links = parse_links_from_markdown(&contents);
-    println!("Found {} rule links in awesome-yara.", rule_links.len());
 
     // For each rule link, clone the repository and copy YARA rule files.
     for link in rule_links {
-        println!("Processing repository: {}", link);
         let repo_folder = format!("./yara/{}", extract_repo_name(&link));
         if let Err(e) = Repository::clone(&link, &repo_folder) {
             eprintln!("Failed to clone {}: {}", link, e);
@@ -85,7 +80,6 @@ fn process_awesome_yara(output_path: &str) {
 
 /// Process an additional YARA GitHub repository.
 fn process_yara_github_repo(repo_url: &str, output_path: &str) {
-    println!("Processing YARA GitHub repository: {}", repo_url);
     let repo_folder = format!("./yara/{}", extract_repo_name(repo_url));
     if let Err(e) = Repository::clone(repo_url, &repo_folder) {
         eprintln!("Failed to clone {}: {}", repo_url, e);
@@ -101,13 +95,12 @@ fn process_yara_github_repo(repo_url: &str, output_path: &str) {
 /// Process an additional YARA webpage source. Depending on the URL, this function
 /// either downloads a raw .yar/.yara file or treats the URL as an HTML page and extracts links.
 fn process_yara_webpage_source(url: &str, output_path: &str) {
-    println!("Processing YARA webpage source: {}", url);
     if url.ends_with(".yar") || url.ends_with(".yara") {
         // Process raw YARA file.
         let response = reqwest::get(url);
         match response {
             Ok(resp) => {
-                if !resp.status().is_success() {
+               if !resp.status().is_success() {
                     eprintln!("Failed to fetch {}: Status {}", url, resp.status());
                     return;
                 }
@@ -150,7 +143,6 @@ fn process_yara_webpage_source(url: &str, output_path: &str) {
                     }
                 };
                 let rule_links = parse_links_from_html(&content);
-                println!("Found {} rule links on webpage.", rule_links.len());
                 for link in rule_links {
                     process_yara_webpage_source(&link, output_path);
                 }
