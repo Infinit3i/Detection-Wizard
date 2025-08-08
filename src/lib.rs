@@ -8,3 +8,4 @@ pub mod yara;
 pub mod sigma;
 pub mod splunk;
 pub mod suricata;
+pub mod qradar;

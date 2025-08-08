@@ -10,6 +10,7 @@ mod suricata;
 mod sigma;
 mod splunk;
 mod download;
+mod qradar;
 
 use eframe::{egui::ViewportBuilder, NativeOptions};
 use crate::main_menu::MainApp;

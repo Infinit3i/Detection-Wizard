@@ -1,6 +1,6 @@
 use crate::download::render_output_path_selector;
 use crate::rule_menu::ToolSelectorApp;
-use crate::{sigma, splunk, suricata, yara};
+use crate::{qradar, sigma, splunk, suricata, yara};
 use eframe::egui;
 use eframe::egui::IconData;
 use egui::Margin;
@@ -163,6 +163,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             "Suricata" => total_work += suricata::suricata_total_sources(),
                             "Sigma" => total_work += sigma::sigma_total_sources(),
                             "Splunk" => total_work += splunk::splunk_total_sources(),
+                            "QRadar" => total_work += qradar::qradar_total_sources(),
                             _ => {}
                         }
                     }
@@ -211,6 +212,12 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 "Splunk" => {
                                     splunk::process_splunk(Some(&mut |cur, _| {
                                         cb(cur, total_work, "splunk".to_string());
+                                    }));
+                                }
+                                "QRadar" => {
+                                    // Add this case
+                                    qradar::process_qradar(Some(&mut |cur, _| {
+                                        cb(cur, total_work, "qradar".to_string());
                                     }));
                                 }
                                 _ => {}
