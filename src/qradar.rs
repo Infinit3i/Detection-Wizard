@@ -7,11 +7,7 @@ use walkdir::WalkDir;
 
 pub fn qradar_github_sources() -> Vec<&'static str> {
     vec![
-        "https://github.com/IBM/qradar-sample-apps.git",
-        "https://github.com/IBM/qradar-contrib.git", 
-        "https://github.com/IBM/qradar-mitre-attack.git",
-        "https://github.com/usama-r/QRadar.git",
-        "https://github.com/zrquan/QRadar-Rule.git",
+        "https://github.com/Xboarder56/QRCE-Rules.git",
     ]
 }
 
@@ -51,11 +47,11 @@ fn process_qradar_github_repo(repo_url: &str) {
 }
 
 /// Process a QRadar webpage source.
-/// If the URL ends with .xml, .json, .rules, or .aql, download it as a rule file;
+/// If the URL ends with .xml, .json, .txt, or .aql, download it as a rule file;
 /// otherwise treat it as an HTML page and extract further links.
 fn process_qradar_webpage_source(url: &str) {
     println!("Processing QRadar webpage source: {}", url);
-    if url.ends_with(".xml") || url.ends_with(".json") || url.ends_with(".rules") || url.ends_with(".aql") {
+    if url.ends_with(".xml") || url.ends_with(".json") || url.ends_with(".aql") || url.ends_with(".txt") {
         let response = reqwest::get(url);
         match response {
             Ok(resp) => {
