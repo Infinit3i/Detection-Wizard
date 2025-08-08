@@ -26,7 +26,6 @@ jobs:
           libgdk-pixbuf2.0-dev \
           libpango1.0-dev \
           libcairo2-dev \
-          libgio-2.0-dev \
           libwayland-dev \
           libxkbcommon-dev \
           libssl-dev \
