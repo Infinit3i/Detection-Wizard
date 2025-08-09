@@ -1,20 +1,13 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
-mod rule_menu;
-mod ioc_menu;
+mod rules;
+mod ioc;
 mod main_menu;
-mod ui_rule;
-mod ui_ioc;
-mod yara;
-mod suricata;
-mod sigma;
-mod splunk;
 mod download;
-mod qradar;
 
 use eframe::{egui::ViewportBuilder, NativeOptions};
-use crate::main_menu::MainApp;
-use crate::ui_rule::load_icon;
+use detection_wizard::main_menu::MainApp;
+use detection_wizard::rules::ui_rule::load_icon;
 use std::sync::Arc;
 
 fn main() -> eframe::Result<()> {

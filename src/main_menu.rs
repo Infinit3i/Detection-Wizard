@@ -1,4 +1,7 @@
-use crate::{ioc_menu::IOCSelectorApp, rule_menu::ToolSelectorApp, ui_ioc, ui_rule};
+use crate::ioc::ioc_menu::IOCSelectorApp;
+use crate::rules::rule_menu::ToolSelectorApp;
+use crate::ioc::ui_ioc;
+use crate::rules::ui_rule;
 use eframe::{egui, App, Frame};
 use egui::Color32;
 use egui::Margin;

@@ -1,6 +1,6 @@
 use crate::download::render_output_path_selector;
 use crate::download::{DownloadFormat, start_download};
-use crate::ioc_menu::{IOCSelectorApp, OutputFormat};
+use super::ioc_menu::{IOCSelectorApp, OutputFormat};
 use eframe::egui;
 use egui::Margin;
 use git2::Repository;

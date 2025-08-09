@@ -1,6 +1,6 @@
 use crate::download::render_output_path_selector;
-use crate::rule_menu::ToolSelectorApp;
-use crate::{qradar, sigma, splunk, suricata, yara};
+use super::rule_menu::ToolSelectorApp;
+use super::{qradar, sigma, splunk, suricata, yara};
 use eframe::egui;
 use eframe::egui::IconData;
 use egui::Margin;
@@ -148,10 +148,25 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         .custom_path
                         .clone()
                         .unwrap_or_else(|| "./rule_output".to_string());
-                    let selected_tools: Vec<&str> = ["Yara", "Suricata", "Sigma", "Splunk"]
+                    
+                    // Find the "All" index dynamically
+                    let all_index = app.tool_names.iter().position(|&x| x == "All");
+                    
+                    // Get all available tools (excluding "All")
+                    let available_tools: Vec<&str> = app.tool_names.iter()
+                        .filter(|&&name| name != "All")
+                        .cloned()
+                        .collect();
+                    
+                    // Filter selected tools based on individual selection or "All" selection
+                    let selected_tools: Vec<&str> = available_tools
                         .iter()
                         .enumerate()
-                        .filter(|(i, _)| app.selected[*i] || app.selected[4])
+                        .filter(|(i, _)| {
+                            // Check if this specific tool is selected OR if "All" is selected
+                            app.selected[*i] || 
+                            (all_index.is_some() && app.selected[all_index.unwrap()])
+                        })
                         .map(|(_, &tool)| tool)
                         .collect();
 
@@ -210,12 +225,14 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                     }));
                                 }
                                 "Splunk" => {
-                                    splunk::process_splunk(Some(&mut |cur, _| {
-                                        cb(cur, total_work, "splunk".to_string());
-                                    }));
+                                    splunk::process_splunk(
+                                        &out_path,
+                                        Some(&mut |cur, _total, file| {
+                                            cb(cur, total_work, file);
+                                        }),
+                                    );
                                 }
                                 "QRadar" => {
-                                    // Add this case
                                     qradar::process_qradar(Some(&mut |cur, _| {
                                         cb(cur, total_work, "qradar".to_string());
                                     }));

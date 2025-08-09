@@ -1,6 +1,5 @@
-use crate::ui_rule;
-use eframe::{egui, App, Frame};
 use std::sync::{Arc, Mutex};
+use eframe::{egui, App, Frame};
 
 pub struct ToolSelectorApp {
     pub tool_names: Vec<&'static str>,
@@ -10,7 +9,6 @@ pub struct ToolSelectorApp {
     pub current_file: Arc<Mutex<Option<String>>>,
     pub cancel_flag: Arc<Mutex<bool>>,
 }
-
 
 impl Default for ToolSelectorApp {
     fn default() -> Self {
@@ -25,9 +23,8 @@ impl Default for ToolSelectorApp {
     }
 }
 
-
 impl App for ToolSelectorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
-        ui_rule::render_ui(self, ctx, || {});
+        super::ui_rule::render_ui(self, ctx, || {});
     }
 }
