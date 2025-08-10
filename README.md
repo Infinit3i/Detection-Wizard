@@ -5,7 +5,7 @@
   <img src="https://raw.githubusercontent.com/Infinit3i/Detection-Wizard/09a7dd892091e11b7548de1730075e723371ce16/assets/detection_wizard.jpeg" alt="Detection Wizard Logo" width="420" />
 </p>
 
-**Detection-Wizard** is a powerful, GUI tool that consolidates detection rules from multiple sources into a single central repository. Whether you're working with **YARA**, **Suricata**, **Sigma**, or **Splunk**. IOCs have also been added so you can manage your infastructure before and **after** and attack and see your security posture.
+**Detection-Wizard** is designed to simplify rule management and enhance threat detection capabilities. This is a GUI tool that consolidates detection rules from multiple sources into a single central repository. Whether you're working with **YARA**, **Suricata**, **Sigma**, **Sysmon**, **QRadar** or **Splunk**. IOCs have also been added so you can manage your infastructure before and **after** and attack and see your security posture.
 
 <p align="center">
     <br>
@@ -40,11 +40,3 @@
 ## Contributing 🤝
 
 Contributions are welcome! Whether you have suggestions for new sources, improvements in parsing logic, or additional features, please feel free to open an issue or submit a pull request. 💡
-
-## License 📄
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-**Detection-Wizard** is designed to simplify rule management and enhance threat detection capabilities. Enjoy using the tool, and happy hunting! 🎯👀
