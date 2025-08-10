@@ -1,37 +1,24 @@
-use crate::download::{download_and_extract_git_repo, download_files_with_progress};
 use std::path::Path;
+use crate::download::process_sources;
 
 pub fn suricata_total_sources() -> usize {
-    GITHUB_REPOS.len()
-        + WEB_SOURCES.iter().filter(|s| !s.is_empty()).count()
+    GITHUB_REPOS.len() + WEB_SOURCES.len()
 }
 
 pub fn process_suricata(
     output_path: &str,
-    mut progress_callback: Option<&mut dyn FnMut(usize, usize, String)>,
+    progress_callback: Option<&mut dyn FnMut(usize, usize, String)>,
 ) {
-    let dest_dir = Path::new(output_path);
-    let total = GITHUB_REPOS.len() + WEB_SOURCES.len();
+    let dest = Path::new(output_path);
 
-    // GitHub repos (.rules)
-    for (i, repo_url) in GITHUB_REPOS.iter().enumerate() {
-        if let Some(cb) = progress_callback.as_mut() {
-            cb(i + 1, total, (*repo_url).to_string());
-        }
-        if let Err(e) = download_and_extract_git_repo(repo_url, dest_dir, Some(".rules")) {
-            eprintln!("❌ Failed to process repo {}: {}", repo_url, e);
-        }
-    }
-
-    // Direct web sources (.rules)
-    for (j, url) in WEB_SOURCES.iter().enumerate() {
-        let idx = GITHUB_REPOS.len() + j;
-        if let Some(cb) = progress_callback.as_mut() {
-            cb(idx + 1, total, (*url).to_string());
-        }
-        let out = dest_dir.to_path_buf();
-        download_files_with_progress(&[*url], &out, "Suricata", Some(".rules"));
-    }
+    process_sources(
+        &GITHUB_REPOS,
+        &WEB_SOURCES,
+        &["rules", "rule"], // allowed extensions
+        dest,
+        progress_callback,
+        Some(60), // per-repo timeout
+    );
 }
 
 pub fn process_suricata_rules(
@@ -45,7 +32,6 @@ pub fn process_suricata_rules(
         eprintln!("Invalid output_path for Suricata");
     }
 }
-
 
 static WEB_SOURCES: [&str; 29] = [
     "https://ti.stamus-networks.io/open/stamus-lateral-rules.tar.gz",

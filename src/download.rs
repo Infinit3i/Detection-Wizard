@@ -5,6 +5,8 @@ use git2::Repository;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+use std::time::Duration;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
@@ -476,4 +478,87 @@ fn download_url_to_dir(
     fs::rename(&tmp_path, &final_path)?;
 
     Ok(Some(final_path))
+}
+
+/// Run common workflow for any rule set:
+/// - clone/copy from `repos` (with optional per-repo timeout)
+/// - download direct `pages` (filtered by `allowed_exts`)
+/// - report progress via `progress_callback`
+/// `allowed_exts` should be like ["yml","yaml"] or ["rules","rule"] (no dots).
+pub fn process_sources(
+    repos: &[&str],
+    pages: &[&str],
+    allowed_exts: &[&str],
+    dest_dir: &std::path::Path,
+    mut progress_callback: Option<&mut dyn FnMut(usize, usize, String)>,
+    repo_timeout_secs: Option<u64>,
+) {
+    let total = repos.len() + pages.len();
+    let mut cur = 0usize;
+
+    // Normalize to no-dot forms (for repo file copying)
+    let allowed_no_dot: Vec<String> = allowed_exts
+        .iter()
+        .map(|e| e.trim_start_matches('.').to_string())
+        .collect();
+
+    // 1) GitHub repos (copy only matching extensions)
+    for repo_url in repos {
+        if let Some(cb) = progress_callback.as_deref_mut() {
+            cb(cur + 1, total, (*repo_url).to_string());
+        }
+
+        let repo = (*repo_url).to_string();
+        let dest = dest_dir.to_path_buf();
+        let exts_owned = allowed_no_dot.clone();
+
+        let finished = if let Some(secs) = repo_timeout_secs {
+            run_with_timeout(Duration::from_secs(secs), move || {
+                let exts_as_str: Vec<&str> = exts_owned.iter().map(|s| s.as_str()).collect();
+                if let Err(e) = clone_and_copy_filtered(&repo, &dest, &exts_as_str) {
+                    eprintln!("❌ Repo {} failed: {}", repo, e);
+                }
+            })
+        } else {
+            let exts_as_str: Vec<&str> = exts_owned.iter().map(|s| s.as_str()).collect();
+            if let Err(e) = clone_and_copy_filtered(&repo, &dest, &exts_as_str) {
+                eprintln!("❌ Repo {} failed: {}", repo, e);
+            }
+            true
+        };
+
+        if !finished {
+            eprintln!("⏱️ Timed out cloning/copying: {}", repo_url);
+        }
+
+        cur += 1;
+    }
+
+    // 2) Direct URLs: try each allowed extension (non-matching ones are skipped)
+    for url in pages {
+        if let Some(cb) = progress_callback.as_deref_mut() {
+            cb(cur + 1, total, (*url).to_string());
+        }
+
+        let out = dest_dir.to_path_buf();
+        for ext in &allowed_no_dot {
+            let dotted = format!(".{}", ext);
+            download_files_with_progress(&[*url], &out, "direct", Some(&dotted));
+        }
+
+        cur += 1;
+    }
+}
+
+/// Tiny utility to run a job with a timeout; returns true if completed in time.
+fn run_with_timeout<F>(timeout: Duration, f: F) -> bool
+where
+    F: FnOnce() + Send + 'static,
+{
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        f();
+        let _ = tx.send(());
+    });
+    rx.recv_timeout(timeout).is_ok()
 }

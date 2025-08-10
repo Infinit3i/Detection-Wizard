@@ -13,7 +13,6 @@ pub fn qradar_github_sources() -> Vec<&'static str> {
 
 pub fn qradar_web_sources() -> Vec<&'static str> {
     vec![
-        "https://raw.githubusercontent.com/IBM/qradar-sample-apps/main/sample_rules.xml",
         "",
     ]
 }
