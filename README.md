@@ -26,10 +26,11 @@
 ## Features ✨
 
 - **Multi-Tool Support:**  
-  - 98,000+ **YARA** rules
-  - **Suricata**: IDS/IPS rules for network security. 🌐
-  - 7,000+ **Sigma** rules
-  - 7 **Sysmon** Configurations
+  - 98,000+ **YARA** files
+      - 2,400,000 rules
+  - 350+ **Suricata** files
+  - 7,000+ **Sigma** files
+  - 7 **Sysmon** Configurations files
  
   - SIEMS
     - **Splunk**: Detection configurations for Splunk environments. 📈
