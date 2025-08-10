@@ -3,6 +3,11 @@
 **Detection-Wizard** is a powerful, GUI tool that consolidates detection rules from multiple sources into a single central repository. Whether you're working with **YARA**, **Suricata**, **Sigma**, or **Splunk**. IOCs have also been added so you can manage your infastructure before and **after** and attack and see your security posture.
 
 <p align="center">
+  <img src="https://raw.githubusercontent.com/Infinit3i/Detection-Wizard/09a7dd892091e11b7548de1730075e723371ce16/assets/detection_wizard.jpeg" alt="Detection Wizard Logo" width="300" />
+</p>
+
+
+<p align="center">
   <br><br>
     <a title="Hits" target="_blank" href="https://github.com/infinit3i/Detection-Wizard"><img src="https://hits.b3log.org/infinit3i/Detection-Wizard.svg"></a>
     <a title="Twitter" target="_blank" href="https://x.com/infinit3i"><img alt="Twitter Follow" src="https://img.shields.io/twitter/follow/b3logos?label=Follow&style=social"></a>
