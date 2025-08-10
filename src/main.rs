@@ -6,9 +6,20 @@ mod main_menu;
 mod download;
 
 use eframe::{egui::ViewportBuilder, NativeOptions};
+use eframe::egui::IconData;            // <-- IconData is in egui
 use detection_wizard::main_menu::MainApp;
-use detection_wizard::rules::ui_rule::load_icon;
 use std::sync::Arc;
+use image::ImageReader;
+use image::GenericImageView;
+
+// Runtime window/taskbar icon loader
+fn load_icon(path: &str) -> Option<IconData> {
+    let reader = ImageReader::open(path).ok()?;  // avoid error-type mismatch
+    let img = reader.decode().ok()?;
+    let (width, height) = img.dimensions();
+    let rgba = img.into_rgba8().into_raw();
+    Some(IconData { rgba, width, height })
+}
 
 fn main() -> eframe::Result<()> {
     let icon_data = load_icon("assets/icon.jpg");

@@ -1,6 +1,6 @@
-use crate::download::render_output_path_selector;
 use super::rule_menu::ToolSelectorApp;
-use super::{qradar, sigma, splunk, suricata, yara, sysmon};
+use super::{qradar, sigma, splunk, suricata, sysmon, yara};
+use crate::download::render_output_path_selector;
 use eframe::egui;
 use egui::Margin;
 use std::sync::{Arc, Mutex};
@@ -136,24 +136,26 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         .custom_path
                         .clone()
                         .unwrap_or_else(|| "./rule_output".to_string());
-                    
+
                     // Find the "All" index dynamically
                     let all_index = app.tool_names.iter().position(|&x| x == "All");
-                    
+
                     // Get all available tools (excluding "All")
-                    let available_tools: Vec<&str> = app.tool_names.iter()
+                    let available_tools: Vec<&str> = app
+                        .tool_names
+                        .iter()
                         .filter(|&&name| name != "All")
                         .cloned()
                         .collect();
-                    
+
                     // Filter selected tools based on individual selection or "All" selection
                     let selected_tools: Vec<&str> = available_tools
                         .iter()
                         .enumerate()
                         .filter(|(i, _)| {
                             // Check if this specific tool is selected OR if "All" is selected
-                            app.selected[*i] || 
-                            (all_index.is_some() && app.selected[all_index.unwrap()])
+                            app.selected[*i]
+                                || (all_index.is_some() && app.selected[all_index.unwrap()])
                         })
                         .map(|(_, &tool)| tool)
                         .collect();
@@ -209,9 +211,12 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                     );
                                 }
                                 "Sigma" => {
-                                    sigma::process_sigma(Some(&mut |cur, _| {
-                                        cb(cur, total_work, "sigma".to_string());
-                                    }));
+                                    sigma::process_sigma(
+                                        &out_path,
+                                        Some(&mut |cur, _| {
+                                            cb(cur, total_work, "sigma".to_string());
+                                        }),
+                                    );
                                 }
                                 "Splunk" => {
                                     splunk::process_splunk(
