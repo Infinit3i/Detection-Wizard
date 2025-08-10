@@ -26,20 +26,15 @@
 ## Features ✨
 
 - **Multi-Tool Support:**  
-  Easily pull and process rules for:
-  - **YARA**: Rule sets for malware and threat detection. 🦠
+  - 98,000+ **YARA** rules
   - **Suricata**: IDS/IPS rules for network security. 🌐
-  - **Sigma**: Generic signatures that can be converted to various SIEM formats. 📊
+  - 7,000+ **Sigma** rules
+  - 7 **Sysmon** Configurations
  
   - SIEMS
     - **Splunk**: Detection configurations for Splunk environments. 📈
     - **QRadar**: Detections for IBM QRadar SIEM
 
-- **Automated Repository Pulling:**  
-  Clone and update rule repositories automatically from curated sources, including:
-  - [awesome-yara](https://github.com/InQuest/awesome-yara) 📂
-  - [awesome-suricata](https://github.com/satta/awesome-suricata) 🔗
-  - Plus, many additional GitHub and web-based resources. 🌍
 
 ## Contributing 🤝
 
