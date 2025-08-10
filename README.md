@@ -13,7 +13,6 @@
   <a href="https://github.com/infinit3i/Detection-Wizard/releases/latest/download/Detection-Wizard.exe">
     <img src="https://img.shields.io/badge/Download%20Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
   </a>
-  <br/>
   <a href="https://github.com/infinit3i/Detection-Wizard/releases/latest/download/Detection-Wizard.elf">
     <img src="https://img.shields.io/badge/Download%20Linux-FF6C37?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux">
   </a>
