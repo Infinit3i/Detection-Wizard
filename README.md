@@ -1,6 +1,7 @@
 # Detection-Wizard 🧙‍♂️🔍
 
 <p align="center">
+    <br>
   <img src="https://raw.githubusercontent.com/Infinit3i/Detection-Wizard/09a7dd892091e11b7548de1730075e723371ce16/assets/detection_wizard.jpeg" alt="Detection Wizard Logo" width="420" />
 </p>
 
