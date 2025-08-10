@@ -1,22 +1,10 @@
 use crate::download::render_output_path_selector;
 use super::rule_menu::ToolSelectorApp;
-use super::{qradar, sigma, splunk, suricata, yara};
+use super::{qradar, sigma, splunk, suricata, yara, sysmon};
 use eframe::egui;
-use eframe::egui::IconData;
 use egui::Margin;
 use std::sync::{Arc, Mutex};
 use std::thread;
-
-pub fn load_icon(path: &str) -> Option<IconData> {
-    let img = image::open(path).ok()?.into_rgba8();
-    let (width, height) = img.dimensions();
-    let rgba = img.into_raw();
-    Some(IconData {
-        rgba,
-        width,
-        height,
-    })
-}
 
 fn run_tool_with_progress<F>(
     ctx: egui::Context,
@@ -179,6 +167,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             "Sigma" => total_work += sigma::sigma_total_sources(),
                             "Splunk" => total_work += splunk::splunk_total_sources(),
                             "QRadar" => total_work += qradar::qradar_total_sources(),
+                            "Sysmon" => total_work += 5,
                             _ => {}
                         }
                     }

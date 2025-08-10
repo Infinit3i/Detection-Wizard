@@ -13,8 +13,8 @@ pub struct ToolSelectorApp {
 impl Default for ToolSelectorApp {
     fn default() -> Self {
         Self {
-            selected: vec![false; 6],
-            tool_names: vec!["Yara", "Suricata", "Sigma", "Splunk", "QRadar", "All"],
+            selected: vec![false; 7],
+            tool_names: vec!["Yara", "Suricata", "Sigma", "Sysmon", "Splunk", "QRadar", "All"],
             progress: Arc::new(Mutex::new(None)),
             current_file: Arc::new(Mutex::new(None)),
             custom_path: None,

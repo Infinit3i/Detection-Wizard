@@ -5,3 +5,4 @@ pub mod sigma;
 pub mod splunk;
 pub mod suricata;
 pub mod qradar;
+pub mod sysmon;
