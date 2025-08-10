@@ -312,5 +312,6 @@ pub fn get_yara_github_repos() -> Vec<&'static str> {
         "https://github.com/VectraThreatLab/reyara.git",
         "https://github.com/x64dbg/yarasigs.git",
         "https://github.com/fr0gger/Yara-Unprotect.git",
+        "https://github.com/chronicle/detection-rules.git",
     ]
 }
