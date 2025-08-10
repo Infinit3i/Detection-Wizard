@@ -27,7 +27,7 @@
 
 - **Multi-Tool Support:**  
   - 98,000+ **YARA** files
-      - 2,400,000 rules
+      - 2,300,000+ **YARA** rules
   - 350+ **Suricata** files
   - 7,000+ **Sigma** files
   - 7 **Sysmon** Configurations files
