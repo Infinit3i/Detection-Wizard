@@ -1,9 +1,39 @@
-use std::path::{Path, PathBuf};
+use crate::download::{process_tool, ToolSpec};
+use eframe::egui::Context;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
 
-// Reuse the shared helpers from download.rs
-use crate::download::{download_and_extract_git_repo, download_files_with_progress};
+pub fn sigma_total_sources() -> usize {
+    SIGMA_REPOS.len() + SIGMA_PAGES.len()
+}
 
-static SIGMA_GITHUB: &[&str] = &[
+pub fn sigma_spec() -> ToolSpec {
+    ToolSpec {
+        name: "Sigma",
+        dest_subfolder: "sigma",
+        repo_urls: &SIGMA_REPOS,
+        page_urls: &SIGMA_PAGES,
+        allowed_exts: &["yml", "yaml"],
+    }
+}
+
+pub fn process_sigma(
+    output_root: &str,
+    progress_triplet: Arc<Mutex<Option<(usize, usize, String)>>>,
+    ctx: Context,
+    cancel_flag: Arc<AtomicBool>,
+) {
+    let _ = process_tool(
+        &sigma_spec(),
+        Path::new(output_root),
+        progress_triplet,
+        ctx,
+        cancel_flag,
+    );
+}
+
+static SIGMA_REPOS: &[&str] = &[
     "https://github.com/SigmaHQ/sigma.git",
     "https://github.com/center-for-threat-informed-defense/cloud-analytics.git",
     "https://github.com/joesecurity/sigma-rules.git",
@@ -18,41 +48,3 @@ static SIGMA_GITHUB: &[&str] = &[
 static SIGMA_PAGES: &[&str] = &[
     "https://raw.githubusercontent.com/delivr-to/detections/refs/heads/main/sigma-rules/file_event_win_pdf_html_smuggle.yml",
 ];
-
-/// Count used by the UI to estimate work.
-pub fn sigma_total_sources() -> usize {
-    SIGMA_GITHUB.len() + SIGMA_PAGES.len()
-}
-
-pub fn process_sigma(
-    output_path: &str,
-    mut progress: Option<&mut dyn FnMut(usize, usize)>,
-) {
-    // Use the UI-provided folder, just like YARA
-    let dest = Path::new(output_path);
-    let dest_buf = PathBuf::from(output_path);
-
-    let total = sigma_total_sources();
-    let mut cur = 0usize;
-
-    // 1) GitHub repos (copy only .yml/.yaml)
-    for repo in SIGMA_GITHUB {
-        let _ = download_and_extract_git_repo(repo, dest, Some(".yml"));
-        let _ = download_and_extract_git_repo(repo, dest, Some(".yaml"));
-        cur += 1;
-        if let Some(cb) = progress.as_deref_mut() {
-            cb(cur, total);
-        }
-    }
-
-    // 2) Direct URLs (“wget”) — use the shared downloader; filter .yml/.yaml
-    for url in SIGMA_PAGES {
-        // Call once for each ext to keep the filters simple and explicit
-        download_files_with_progress(&[*url], &dest_buf, "Sigma", Some(".yml"));
-        download_files_with_progress(&[*url], &dest_buf, "Sigma", Some(".yaml"));
-        cur += 1;
-        if let Some(cb) = progress.as_deref_mut() {
-            cb(cur, total);
-        }
-    }
-}

@@ -3,6 +3,7 @@ use super::{qradar, sigma, splunk, suricata, sysmon, yara};
 use crate::download::render_output_path_selector;
 use eframe::egui;
 use egui::Margin;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -48,14 +49,12 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
             let show_progress = false;
 
             if let Ok(mut guard) = app.progress.lock() {
-                if let Some((current, total)) = *guard {
-                    let percent = (current as f32 / total as f32) * 100.0;
+                if let Some((current, total, ref current_name)) = *guard {
+                    let percent = (current as f32 / total.max(1) as f32) * 100.0;
                     ui.label(format!("Progress: {}/{} ({:.0}%)", current, total, percent));
                     ui.add(egui::ProgressBar::new(percent / 100.0).show_percentage());
-                    if let Ok(f) = app.current_file.lock() {
-                        if let Some(name) = &*f {
-                            ui.label(format!("Currently processing: {}", name));
-                        }
+                    if !current_name.is_empty() {
+                        ui.label(format!("Currently processing: {}", current_name));
                     }
 
                     if current >= total {
@@ -75,9 +74,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 .clicked()
                             {
                                 *guard = None;
-                                if let Ok(mut cancel) = app.cancel_flag.lock() {
-                                    *cancel = true;
-                                }
+                                app.cancel_flag.store(true, Ordering::Relaxed);
                             }
                         });
 
@@ -130,7 +127,12 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 render_output_path_selector(ui, &mut app.custom_path, "./rule_output");
 
                 ui.add_space(20.0);
-                if ui.button("Run Selected").clicked() {
+                let any_selected = app.selected.iter().any(|&v| v);
+
+                if ui
+                    .add_enabled(any_selected, egui::Button::new("Run Selected"))
+                    .clicked()
+                {
                     let ctx = ctx.clone();
                     let custom_path = app
                         .custom_path
@@ -169,71 +171,62 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             "Sigma" => total_work += sigma::sigma_total_sources(),
                             "Splunk" => total_work += splunk::splunk_total_sources(),
                             "QRadar" => total_work += qradar::qradar_total_sources(),
-                            "Sysmon" => total_work += 5,
+                            "Sysmon" => total_work += sysmon::sysmon_total_sources(),
                             _ => {}
                         }
                     }
 
-                    // Reset progress state
+                    // Reset progress state (triplet!)
                     if let Ok(mut p) = app.progress.lock() {
-                        *p = Some((0, total_work));
+                        *p = Some((0, total_work, String::new()));
                     }
 
-                    // Then spawn each tool in parallel
+                    // spawn one thread per tool
                     for tool in selected_tools {
-                        let ctx = ctx.clone();
-                        let progress = Arc::clone(&app.progress);
-                        let current_file = Arc::clone(&app.current_file);
-                        let cancel_flag = Arc::new(Mutex::new(false));
-                        let out_path = format!("{}/{}", custom_path, tool.to_lowercase());
+                        let out_path = custom_path.clone();
+                        let progress_triplet = Arc::clone(&app.progress);
+                        let cancel_flag = Arc::clone(&app.cancel_flag);
+                        let ctx_clone = ctx.clone();
 
-                        run_tool_with_progress(
-                            ctx,
-                            Arc::clone(&progress),
-                            Arc::clone(&current_file),
-                            Arc::clone(&cancel_flag),
-                            move |cb| match tool {
-                                "Yara" => {
-                                    yara::process_yara(
-                                        &out_path,
-                                        Some(&mut |cur, _total, file| {
-                                            cb(cur, total_work, file);
-                                        }),
-                                    );
-                                }
-                                "Suricata" => {
-                                    suricata::process_suricata_rules(
-                                        vec![out_path.clone().into()],
-                                        out_path.clone().into(),
-                                        Some(&mut |cur, _total, file| {
-                                            cb(cur, total_work, file);
-                                        }),
-                                    );
-                                }
-                                "Sigma" => {
-                                    sigma::process_sigma(
-                                        &out_path,
-                                        Some(&mut |cur, _| {
-                                            cb(cur, total_work, "sigma".to_string());
-                                        }),
-                                    );
-                                }
-                                "Splunk" => {
-                                    splunk::process_splunk(
-                                        &out_path,
-                                        Some(&mut |cur, _total, file| {
-                                            cb(cur, total_work, file);
-                                        }),
-                                    );
-                                }
-                                "QRadar" => {
-                                    qradar::process_qradar(Some(&mut |cur, _| {
-                                        cb(cur, total_work, "qradar".to_string());
-                                    }));
-                                }
-                                _ => {}
-                            },
-                        );
+                        std::thread::spawn(move || match tool {
+                            "Yara" => yara::process_yara(
+                                &out_path,
+                                Arc::clone(&progress_triplet),
+                                ctx_clone.clone(),
+                                Arc::clone(&cancel_flag),
+                            ),
+                            "Suricata" => suricata::process_suricata(
+                                &out_path,
+                                Arc::clone(&progress_triplet),
+                                ctx_clone.clone(),
+                                Arc::clone(&cancel_flag),
+                            ),
+                            "Sigma" => sigma::process_sigma(
+                                &out_path,
+                                Arc::clone(&progress_triplet),
+                                ctx_clone.clone(),
+                                Arc::clone(&cancel_flag),
+                            ),
+                            "Splunk" => splunk::process_splunk(
+                                &out_path,
+                                Arc::clone(&progress_triplet),
+                                ctx_clone.clone(),
+                                Arc::clone(&cancel_flag),
+                            ),
+                            "QRadar" => qradar::process_qradar(
+                                &out_path,
+                                Arc::clone(&progress_triplet),
+                                ctx_clone.clone(),
+                                Arc::clone(&cancel_flag),
+                            ),
+                            "Sysmon" => sysmon::process_sysmon(
+                                &out_path,
+                                Arc::clone(&progress_triplet),
+                                ctx_clone.clone(),
+                                Arc::clone(&cancel_flag),
+                            ),
+                            _ => {}
+                        });
                     }
                 }
             }

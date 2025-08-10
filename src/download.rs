@@ -2,19 +2,19 @@ use chrono::Local;
 use eframe::egui::{self, Context};
 use egui::Color32;
 use git2::Repository;
+use rfd::{MessageButtons, MessageDialog, MessageDialogResult, MessageLevel};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
-use std::time::Duration;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
 };
 use std::thread;
+use std::time::Duration;
 use tempfile::tempdir;
 use walkdir::WalkDir;
-use rfd::{MessageDialog, MessageButtons, MessageLevel, MessageDialogResult};
 
 /// Output format for IOC text aggregations (kept for parity with your existing design)
 #[derive(Clone, Copy)]
@@ -35,12 +35,13 @@ fn ext_allowed(file_name: &str, allowed_exts: &[&str]) -> bool {
     if allowed_exts.is_empty() {
         return true; // allow all if not specified
     }
-    let Some(ext) = std::path::Path::new(file_name).extension().and_then(|e| e.to_str()) else {
+    let Some(ext) = std::path::Path::new(file_name)
+        .extension()
+        .and_then(|e| e.to_str())
+    else {
         return false;
     };
-    allowed_exts
-        .iter()
-        .any(|al| al.eq_ignore_ascii_case(ext))
+    allowed_exts.iter().any(|al| al.eq_ignore_ascii_case(ext))
 }
 
 pub fn process_tool(
@@ -54,73 +55,78 @@ pub fn process_tool(
     let dest_dir = output_root.join(spec.dest_subfolder);
     fs::create_dir_all(&dest_dir)?;
 
-    // repos + direct URLs
-    let total = spec.repo_urls.len() + spec.page_urls.len();
-    {
-        let mut p = progress.lock().unwrap();
-        *p = Some((0, total, String::new()));
-    }
-    ctx.request_repaint();
-
     let spec_name = spec.name;
     let allowed = spec.allowed_exts;
-    let repos = spec.repo_urls;
-    let pages = spec.page_urls;
+    let repos = spec.repo_urls.to_vec();
+    let pages = spec.page_urls.to_vec();
     let dest_dir_clone = dest_dir.clone();
 
     thread::spawn(move || {
-        let mut done = 0usize;
-
         // 1) Repos
         for repo_url in repos {
-            if cancel_flag.load(Ordering::Relaxed) { break; }
+            if cancel_flag.load(Ordering::Relaxed) {
+                break;
+            }
+            // show current item (keep existing done/total)
             {
                 let mut p = progress.lock().unwrap();
-                *p = Some((done, total, repo_url.to_string()));
+                let (cur, tot) = match *p {
+                    Some((c, t, _)) => (c, t),
+                    None => (0, 0),
+                };
+                *p = Some((cur, tot, repo_url.to_string()));
             }
             ctx.request_repaint();
 
-            if let Err(e) = clone_and_copy_filtered(repo_url, &dest_dir_clone, allowed) {
+            if let Err(e) = clone_and_copy_filtered(&repo_url, &dest_dir_clone, allowed) {
                 eprintln!("[{}] Repo failed {}: {}", spec_name, repo_url, e);
             }
 
-            done += 1;
+            // increment done after finishing the unit
             {
                 let mut p = progress.lock().unwrap();
-                *p = Some((done, total, repo_url.to_string()));
+                let (cur, tot) = match *p {
+                    Some((c, t, _)) => (c, t),
+                    None => (0, 0),
+                };
+                *p = Some((cur + 1, tot, String::new()));
             }
             ctx.request_repaint();
         }
 
         // 2) Direct URLs (“wget”)
         for page_url in pages {
-            if cancel_flag.load(Ordering::Relaxed) { break; }
+            if cancel_flag.load(Ordering::Relaxed) {
+                break;
+            }
+            // show current item (keep existing done/total)
             {
                 let mut p = progress.lock().unwrap();
-                *p = Some((done, total, page_url.to_string()));
+                let (cur, tot) = match *p {
+                    Some((c, t, _)) => (c, t),
+                    None => (0, 0),
+                };
+                *p = Some((cur, tot, page_url.to_string()));
             }
             ctx.request_repaint();
 
-            match download_url_to_dir(page_url, &dest_dir_clone, allowed) {
+            match download_url_to_dir(&page_url, &dest_dir_clone, allowed) {
                 Ok(Some(_path)) => {}
-                Ok(None) => {} // filtered or skipped by overwrite
+                Ok(None) => {} // filtered or overwrite-skip
                 Err(e) => eprintln!("[{}] URL failed {}: {}", spec_name, page_url, e),
             }
 
-            done += 1;
+            // increment done after finishing the unit
             {
                 let mut p = progress.lock().unwrap();
-                *p = Some((done, total, page_url.to_string()));
+                let (cur, tot) = match *p {
+                    Some((c, t, _)) => (c, t),
+                    None => (0, 0),
+                };
+                *p = Some((cur + 1, tot, String::new()));
             }
             ctx.request_repaint();
         }
-
-        // Finish
-        {
-            let mut p = progress.lock().unwrap();
-            *p = Some((done, total, String::new()));
-        }
-        ctx.request_repaint();
     });
 
     Ok(())
@@ -157,13 +163,33 @@ fn clone_and_copy_filtered(
     dest_dir: &Path,
     allowed_exts: &[&str],
 ) -> io::Result<()> {
-    let tmp = tempdir()?;
-    let tmp_path = tmp.path();
+    let tmp = tempfile::tempdir()?;
+    let tmp_path = tmp.path().to_path_buf(); // kept for post-clone checks
+    let clone_path = tmp_path.clone(); // moved into the closure
+    let repo = repo_url.to_string();
 
-    Repository::clone(repo_url, tmp_path)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.message()))?;
+    // 30s timeout around the clone
+    let finished =
+        crate::download::run_with_timeout(std::time::Duration::from_secs(30), move || {
+            let _ = git2::Repository::clone(&repo, &clone_path);
+        });
 
-    copy_filtered_files(tmp_path, dest_dir, allowed_exts)
+    if !finished {
+        return Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!("git clone timed out (>30s): {}", repo_url),
+        ));
+    }
+
+    // If clone failed or nothing was created, skip
+    if !tmp_path.exists() || tmp_path.read_dir().map_or(true, |mut r| r.next().is_none()) {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("git clone failed or empty: {}", repo_url),
+        ));
+    }
+
+    copy_filtered_files(&tmp_path, dest_dir, allowed_exts)
 }
 
 fn copy_filtered_files(src: &Path, dest_dir: &Path, allowed_exts: &[&str]) -> io::Result<()> {
@@ -370,7 +396,6 @@ fn overwrite_policy() -> &'static Mutex<OverwritePolicy> {
 /// (1) Overwrite this file?  (Yes/No)
 /// (2) Apply this choice to all files? (Yes/No)
 fn prompt_overwrite_native(path: &Path) -> OverwriteAction {
-
     let q1 = MessageDialog::new()
         .set_level(MessageLevel::Warning)
         .set_title("File already exists")
@@ -473,7 +498,9 @@ fn download_url_to_dir(
 
     let tmp_dir = tempdir_in(dest_dir)?;
     let tmp_path = tmp_dir.path().join(format!("{}.part", file_name));
-    let text = resp.text().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let text = resp
+        .text()
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     fs::write(&tmp_path, text.as_bytes())?;
     fs::rename(&tmp_path, &final_path)?;
 

@@ -1,22 +1,36 @@
+use crate::download::{process_tool, ToolSpec};
+use eframe::egui::Context;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
+
 pub fn yara_total_sources() -> usize {
-    YARA_REPOS.len()
+    YARA_REPOS.len() + YARA_PAGES.len()
+}
+
+pub fn yara_spec() -> ToolSpec {
+    ToolSpec {
+        name: "Yara",
+        dest_subfolder: "yara",
+        repo_urls: &YARA_REPOS,
+        page_urls: &YARA_PAGES,
+        allowed_exts: &["yar", "yara", "txt"],
+    }
 }
 
 pub fn process_yara(
-    output_path: &str,
-    mut progress_callback: Option<&mut dyn FnMut(usize, usize, String)>,
+    output_root: &str,
+    progress_triplet: Arc<Mutex<Option<(usize, usize, String)>>>,
+    ctx: Context,
+    cancel_flag: Arc<AtomicBool>,
 ) {
-    use std::path::Path;
-    let total = YARA_REPOS.len();
-    let dest = Path::new(output_path);
-
-    for (i, repo_url) in YARA_REPOS.iter().enumerate() {
-        if let Some(cb) = progress_callback.as_mut() {
-            cb(i + 1, total, (*repo_url).to_string());
-        }
-        let _ = crate::download::download_and_extract_git_repo(repo_url, dest, Some(".yar"));
-        let _ = crate::download::download_and_extract_git_repo(repo_url, dest, Some(".yara"));
-    }
+    let _ = process_tool(
+        &yara_spec(),
+        Path::new(output_root),
+        progress_triplet,
+        ctx,
+        cancel_flag,
+    );
 }
 
 static YARA_REPOS: [&str; 69] = [
@@ -90,3 +104,5 @@ static YARA_REPOS: [&str; 69] = [
     "https://github.com/fr0gger/Yara-Unprotect.git",
     "https://github.com/chronicle/detection-rules.git",
 ];
+
+static YARA_PAGES: [&str; 0] = [];
