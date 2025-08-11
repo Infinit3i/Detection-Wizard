@@ -9,10 +9,10 @@
 
 <p align="center">
     <br>
-  <a href="https://github.com/Infinit3i/Detection-Wizard/releases/download/1.3.0/detection-wizard-1-3-0.exe" style="margin-right: 20px;">
+  <a href="https://github.com/Infinit3i/Detection-Wizard/releases/download/1.4.0/detection-wizard-1-4-0.exe" style="margin-right: 20px;">
     <img src="https://img.shields.io/badge/Download%20Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
   </a>
-  <a href="https://github.com/Infinit3i/Detection-Wizard/releases/download/1.3.0/detection-wizard-1-3-0.elf" style="margin-left: 20px;">
+  <a href="https://github.com/Infinit3i/Detection-Wizard/releases/download/1.4.0/detection-wizard-1-4-0.elf" style="margin-left: 20px;">
     <img src="https://img.shields.io/badge/Download%20Linux-FF6C37?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux">
   </a>
 </p>
