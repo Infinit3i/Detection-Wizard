@@ -1,7 +1,6 @@
 use chrono::Local;
 use eframe::egui::{self, Context};
 use egui::Color32;
-use git2::Repository;
 use rfd::{MessageButtons, MessageDialog, MessageDialogResult, MessageLevel};
 use std::fs;
 use std::io;
@@ -13,7 +12,6 @@ use std::sync::{
 };
 use std::thread;
 use std::time::Duration;
-use tempfile::tempdir;
 use walkdir::WalkDir;
 
 /// Output format for IOC text aggregations (kept for parity with your existing design)

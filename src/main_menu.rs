@@ -1,8 +1,8 @@
 use crate::ioc::ioc_menu::IOCSelectorApp;
-use crate::rules::rule_menu::ToolSelectorApp;
 use crate::ioc::ui_ioc;
+use crate::rules::rule_menu::ToolSelectorApp;
 use crate::rules::ui_rule;
-use eframe::{egui, App, Frame};
+use eframe::{App, Frame, egui};
 use egui::Color32;
 use egui::Margin;
 
@@ -14,18 +14,31 @@ pub enum Screen {
 
 pub struct MainApp {
     pub screen: Screen,
+    did_center: bool,
 }
 
 impl Default for MainApp {
     fn default() -> Self {
         Self {
             screen: Screen::Menu,
+            did_center: false,
         }
     }
 }
 
 impl App for MainApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+        if !self.did_center {
+            self.did_center = true;
+
+            // Set initial size first (pick whatever you want)
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(1100.0, 720.0)));
+
+            // Then center on the current screen (0.32 API)
+            if let Some(cmd) = egui::ViewportCommand::center_on_screen(ctx) {
+                ctx.send_viewport_cmd(cmd);
+            }
+        }
         // Take ownership of screen so we can mutate it safely
         let mut screen = std::mem::replace(&mut self.screen, Screen::Menu);
 
@@ -49,8 +62,8 @@ impl App for MainApp {
                 egui::CentralPanel::default()
                     .frame(
                         egui::Frame::default()
-                            .inner_margin(Margin::same(30.0))
-                            .outer_margin(Margin::same(20.0)),
+                            .inner_margin(Margin::same(30))
+                            .outer_margin(Margin::same(20)),
                     )
                     .show(ctx, |ui| {
                         ui.heading("🔧 Detection Wizard");

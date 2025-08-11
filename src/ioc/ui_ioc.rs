@@ -19,8 +19,8 @@ pub fn render_ui_ioc(
     egui::CentralPanel::default()
         .frame(
             egui::Frame::default()
-                .inner_margin(Margin::same(30.0))
-                .outer_margin(Margin::same(20.0)),
+                .inner_margin(Margin::same(30))
+                .outer_margin(Margin::same(20)),
         )
         .show(ctx, |ui| {
             if !app.overwrite_queue.is_empty() && app.overwrite_index < app.overwrite_queue.len() {

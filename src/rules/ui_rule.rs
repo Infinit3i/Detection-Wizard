@@ -42,8 +42,8 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
     egui::CentralPanel::default()
         .frame(
             egui::Frame::default()
-                .inner_margin(Margin::same(30.0))
-                .outer_margin(Margin::same(20.0)),
+                .inner_margin(Margin::same(30))
+                .outer_margin(Margin::same(20)),
         )
         .show(ctx, |ui| {
             let show_progress = false;
