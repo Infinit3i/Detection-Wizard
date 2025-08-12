@@ -33,7 +33,10 @@ pub fn process_splunk(
     );
 }
 
-static SPLUNK_REPOS: [&str; 1] = [
+static SPLUNK_REPOS: &[&str] = &[
     "https://github.com/Infinit3i/Defensive-Rules.git",
+    "https://github.com/mthcht/ThreatHunting-Keywords.git",
+    "https://github.com/splunk/security_content.git",
+    "https://github.com/anvilogic-forge/armory.git",
 ];
 static SPLUNK_PAGES: [&str; 0] = [];
