@@ -103,6 +103,7 @@ static YARA_REPOS: [&str; 69] = [
     "https://github.com/x64dbg/yarasigs.git",
     "https://github.com/fr0gger/Yara-Unprotect.git",
     "https://github.com/chronicle/detection-rules.git",
+    "https://github.com/JPCERTCC/jpcert-yara.git",
 ];
 
 static YARA_PAGES: [&str; 0] = [];
