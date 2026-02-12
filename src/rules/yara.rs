@@ -33,7 +33,7 @@ pub fn process_yara(
     );
 }
 
-static YARA_REPOS: [&str; 69] = [
+static YARA_REPOS: [&str; 70] = [
     "https://github.com/advanced-threat-research/Yara-Rules.git",
     "https://github.com/avast/ioc.git",
     "https://github.com/chronicle/GCTI.git",
