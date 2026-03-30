@@ -29,6 +29,7 @@ jobs:
           libwayland-dev \
           libxkbcommon-dev \
           libssl-dev \
+          libvulkan-dev \
           pkg-config
     
     - name: Build
