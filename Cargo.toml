@@ -12,7 +12,7 @@ reqwest = { version = "0.11", features = ["blocking"] }
 zip = "4.3.0"
 flate2 = "1.0"
 tar = "0.4"
-eframe = "0.32.0"
+eframe = { version = "0.32.0", default-features = false, features = ["default_fonts", "glow", "wgpu"] }
 egui = "0.32.0"
 image = "0.25"
 chrono = "0.4"
