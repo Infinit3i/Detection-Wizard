@@ -19,19 +19,37 @@ fn load_icon(path: &str) -> Option<IconData> {
     })
 }
 
+/// Check if wgpu (DirectX 12/Vulkan/Metal) can find a usable GPU adapter.
+/// Returns true if wgpu will work, false if we should fall back to glow (OpenGL).
+fn wgpu_available() -> bool {
+    std::panic::catch_unwind(|| {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+        let adapter = pollster::block_on(
+            instance.request_adapter(&wgpu::RequestAdapterOptions::default()),
+        );
+        adapter.is_ok()
+    })
+    .unwrap_or(false)
+}
+
 fn main() -> eframe::Result<()> {
     let icon_data = load_icon("assets/icon.jpg");
 
-    // Set your preferred size
     let mut viewport = ViewportBuilder::default().with_inner_size(vec2(1100.0, 720.0));
 
     if let Some(icon) = icon_data {
         viewport = viewport.with_icon(Arc::new(icon));
     }
 
+    let renderer = if wgpu_available() {
+        eframe::Renderer::Wgpu
+    } else {
+        eframe::Renderer::Glow
+    };
+
     let options = NativeOptions {
         viewport,
-        renderer: eframe::Renderer::Wgpu,
+        renderer,
         ..Default::default()
     };
 
