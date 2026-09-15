@@ -460,6 +460,91 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 ui.add_space(20.0);
                 let any_selected = app.selected.iter().any(|&v| v);
 
+                // ---------- Mismatch guardrails ----------
+                {
+                    // Which tools are effectively selected (individually or via "All")?
+                    let tool_on = |name: &str| -> bool {
+                        let all_on = app
+                            .tool_names
+                            .iter()
+                            .position(|&x| x == "All")
+                            .map_or(false, |i| app.selected[i]);
+                        all_on
+                            || app
+                                .tool_names
+                                .iter()
+                                .position(|&x| x == name)
+                                .map_or(false, |i| app.selected[i])
+                    };
+
+                    let sourcetypes_on = app.sourcetype_selected.iter().any(|&v| v);
+                    let tables_on = app.azure_table_selected.iter().any(|&v| v);
+
+                    let mut warnings: Vec<String> = Vec::new();
+
+                    // Sourcetypes are Splunk/QRadar text-rule concepts.
+                    if sourcetypes_on && !tool_on("Splunk") && !tool_on("QRadar") {
+                        warnings.push(
+                            "Splunk sourcetypes are selected but neither Splunk nor QRadar is \
+                             checked — this filter will match nothing from the selected tools."
+                                .to_string(),
+                        );
+                    }
+
+                    // Azure/M365 tables are matched in Sigma, Splunk and QRadar rules.
+                    if tables_on
+                        && !tool_on("Sigma")
+                        && !tool_on("Splunk")
+                        && !tool_on("QRadar")
+                    {
+                        warnings.push(
+                            "Azure/M365 tables are selected but none of Sigma, Splunk or QRadar \
+                             is checked — no selected tool consumes table filters."
+                                .to_string(),
+                        );
+                    }
+
+                    // APT free-text terms that all get dropped (too short / blacklisted generics).
+                    let raw_terms: Vec<String> = app
+                        .apt_custom_terms
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    if !raw_terms.is_empty() {
+                        let kept = crate::filter::clean_apt_terms(&raw_terms);
+                        let no_groups = !app.apt_selected.iter().any(|&v| v);
+                        if kept.is_empty() && no_groups {
+                            warnings.push(
+                                "The extra actor terms are all too short (<3 chars) or generic \
+                                 command names — they are ignored, so no actor filter is applied."
+                                    .to_string(),
+                            );
+                        }
+                    }
+
+                    for w in &warnings {
+                        egui::Frame::new()
+                            .fill(egui::Color32::from_rgb(60, 45, 20))
+                            .inner_margin(Margin::same(8))
+                            .corner_radius(4)
+                            .show(ui, |ui| {
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label(
+                                        egui::RichText::new("⚠ ")
+                                            .strong()
+                                            .color(egui::Color32::from_rgb(240, 190, 80)),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(w)
+                                            .color(egui::Color32::from_rgb(240, 200, 120)),
+                                    );
+                                });
+                            });
+                        ui.add_space(6.0);
+                    }
+                }
+
                 // ---------- Plain-English filter summary ----------
                 {
                     // Collect selected labels per dimension (empty = "all")

@@ -372,6 +372,16 @@ const TERM_BLACKLIST: &[&str] = &[
     "ssh",
 ];
 
+/// Trim, drop too-short (<3 chars) and blacklisted generic terms. Shared by the
+/// filter builder and the UI's mismatch guardrail so both agree on what "counts".
+pub fn clean_apt_terms(terms: &[String]) -> Vec<String> {
+    terms
+        .iter()
+        .map(|t| t.trim().to_string())
+        .filter(|t| t.len() >= 3 && !TERM_BLACKLIST.contains(&t.to_lowercase().as_str()))
+        .collect()
+}
+
 impl CompiledFilter {
     /// A filter that passes everything (both filters inactive).
     pub fn none() -> Self {
@@ -414,11 +424,7 @@ impl CompiledFilter {
         splunk_sourcetypes: Vec<String>,
         technique_ids: Vec<String>,
     ) -> Self {
-        let cleaned: Vec<String> = apt_terms
-            .into_iter()
-            .map(|t| t.trim().to_string())
-            .filter(|t| t.len() >= 3 && !TERM_BLACKLIST.contains(&t.to_lowercase().as_str()))
-            .collect();
+        let cleaned: Vec<String> = clean_apt_terms(&apt_terms);
 
         let apt_regex = if cleaned.is_empty() {
             None

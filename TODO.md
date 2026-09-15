@@ -19,11 +19,11 @@ Ranked by impact-to-effort. Items 1–3 are each ~1 hour in the existing egui co
 - Note: a true pre-download "Preview" would need a persistent rule cache; revisit
   if repos are ever cached locally between runs.
 
-## 3. Mismatch guardrails
-- [ ] Warn when Splunk sourcetypes are selected but the Splunk tool is unchecked.
-- [ ] Warn when Azure tables are selected but neither Sigma nor Splunk is checked.
-- [ ] Warn when APT custom terms are all blacklisted/too short (filter ends up empty).
-- Why: these are silent no-ops today — classic new-user dead ends.
+## 3. Mismatch guardrails  ✅
+- [x] Warn when Splunk sourcetypes are selected but neither Splunk nor QRadar is checked.
+- [x] Warn when Azure tables are selected but none of Sigma/Splunk/QRadar is checked.
+- [x] Warn when APT custom terms are all blacklisted/too short (filter ends up empty).
+- Note: warnings render above the filter summary; they inform, they don't block Run.
 
 ## 4. Stack presets + save/load
 - [ ] 4–5 one-click presets that set tools + sources + tables/sourcetypes together:
