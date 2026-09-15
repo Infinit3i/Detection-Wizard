@@ -4,6 +4,7 @@ use crate::apt_catalog::{expand_terms, APT_GROUPS};
 use crate::azure_tables::AZURE_TABLES;
 use crate::download::render_output_path_selector;
 use crate::filter::{CompiledFilter, LOG_SOURCES};
+use crate::splunk_sourcetypes::SPLUNK_SOURCETYPES;
 use eframe::egui;
 use egui::Margin;
 use std::sync::atomic::Ordering;
@@ -191,6 +192,79 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         });
                     });
 
+                // ---------- Granular Splunk sourcetype targeting ----------
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
+                let st_count = app.sourcetype_selected.iter().filter(|&&v| v).count();
+                let st_header = if st_count > 0 {
+                    format!("Splunk sourcetypes ({} selected)", st_count)
+                } else {
+                    "Splunk sourcetypes (optional, none selected)".to_string()
+                };
+                egui::CollapsingHeader::new(st_header)
+                    .id_salt("splunk_sourcetypes_header")
+                    .default_open(app.sourcetypes_open)
+                    .show(ui, |ui| {
+                        ui.label(
+                            egui::RichText::new(
+                                "Pick the exact sourcetypes you ingest in Splunk. Selecting any \
+                                 sourcetype keeps only rules that reference a selected sourcetype.",
+                            )
+                            .size(12.0)
+                            .color(egui::Color32::GRAY),
+                        );
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Search:");
+                            ui.text_edit_singleline(&mut app.sourcetype_search);
+                            if st_count > 0 && ui.small_button("Clear").clicked() {
+                                for v in app.sourcetype_selected.iter_mut() {
+                                    *v = false;
+                                }
+                            }
+                        });
+                        ui.add_space(4.0);
+
+                        let st_needle = app.sourcetype_search.to_lowercase();
+                        egui::ScrollArea::vertical()
+                            .id_salt("sourcetype_scroll")
+                            .max_height(260.0)
+                            .show(ui, |ui| {
+                                let mut last_category = "";
+                                for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
+                                    if !st_needle.is_empty()
+                                        && !def.name.to_lowercase().contains(&st_needle)
+                                        && !def.category.to_lowercase().contains(&st_needle)
+                                    {
+                                        continue;
+                                    }
+                                    if def.category != last_category {
+                                        ui.add_space(6.0);
+                                        ui.label(
+                                            egui::RichText::new(def.category).strong().size(13.0),
+                                        );
+                                        last_category = def.category;
+                                    }
+                                    ui.checkbox(&mut app.sourcetype_selected[i], def.name);
+                                }
+                            });
+
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            if ui.small_button("Select all visible").clicked() {
+                                for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
+                                    if st_needle.is_empty()
+                                        || def.name.to_lowercase().contains(&st_needle)
+                                        || def.category.to_lowercase().contains(&st_needle)
+                                    {
+                                        app.sourcetype_selected[i] = true;
+                                    }
+                                }
+                            }
+                        });
+                    });
+
                 // ---------- APT targeting ----------
                 ui.add_space(10.0);
                 ui.separator();
@@ -288,10 +362,18 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         .map(|(_, d)| d.name.to_string())
                         .collect();
 
-                    let filter = Arc::new(CompiledFilter::build_with_tables(
+                    let selected_sourcetypes: Vec<String> = SPLUNK_SOURCETYPES
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.sourcetype_selected[*i])
+                        .map(|(_, d)| d.name.to_string())
+                        .collect();
+
+                    let filter = Arc::new(CompiledFilter::build_full(
                         source_ids,
                         apt_terms,
                         selected_tables,
+                        selected_sourcetypes,
                     ));
 
                     // Find the "All" index dynamically

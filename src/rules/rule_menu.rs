@@ -1,6 +1,7 @@
 use crate::apt_catalog::APT_GROUPS;
 use crate::azure_tables::AZURE_TABLES;
 use crate::filter::LOG_SOURCES;
+use crate::splunk_sourcetypes::SPLUNK_SOURCETYPES;
 use eframe::{egui, App, Frame};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
@@ -31,6 +32,14 @@ pub struct ToolSelectorApp {
     pub azure_table_search: String,
     /// show/hide the Azure table picker section
     pub azure_tables_open: bool,
+
+    // --- Targeting: granular Splunk sourcetypes ---
+    /// parallel to crate::splunk_sourcetypes::SPLUNK_SOURCETYPES; all false = filter off
+    pub sourcetype_selected: Vec<bool>,
+    /// live search box for the sourcetype list
+    pub sourcetype_search: String,
+    /// show/hide the Splunk sourcetype picker section
+    pub sourcetypes_open: bool,
 }
 
 impl Default for ToolSelectorApp {
@@ -48,6 +57,9 @@ impl Default for ToolSelectorApp {
             azure_table_selected: vec![false; AZURE_TABLES.len()],
             azure_table_search: String::new(),
             azure_tables_open: false,
+            sourcetype_selected: vec![false; SPLUNK_SOURCETYPES.len()],
+            sourcetype_search: String::new(),
+            sourcetypes_open: false,
         }
     }
 }

@@ -5,3 +5,4 @@ pub mod ioc;
 pub mod filter;
 pub mod apt_catalog;
 pub mod azure_tables;
+pub mod splunk_sourcetypes;

@@ -144,6 +144,10 @@ pub struct CompiledFilter {
     table_regex: Option<RegexSet>,
     /// sigma logsource.service values the selected tables map to
     table_sigma_services: Vec<String>,
+    /// selected Splunk sourcetypes (granular targeting); empty = inactive
+    pub splunk_sourcetypes: Vec<String>,
+    /// case-insensitive boundary-aware matcher over splunk_sourcetypes
+    sourcetype_regex: Option<RegexSet>,
 }
 
 /// Generic software/tool names that appear in MITRE "uses" relationships but
@@ -166,13 +170,15 @@ impl CompiledFilter {
             azure_tables: Vec::new(),
             table_regex: None,
             table_sigma_services: Vec::new(),
+            splunk_sourcetypes: Vec::new(),
+            sourcetype_regex: None,
         }
     }
 
     /// Build from UI selections. `apt_terms` should already be the expanded
     /// list (group names + aliases + software) from the MITRE catalog.
     pub fn build(source_ids: Vec<String>, apt_terms: Vec<String>) -> Self {
-        Self::build_with_tables(source_ids, apt_terms, Vec::new())
+        Self::build_full(source_ids, apt_terms, Vec::new(), Vec::new())
     }
 
     /// Build including granular Azure/M365 table targeting.
@@ -180,6 +186,16 @@ impl CompiledFilter {
         source_ids: Vec<String>,
         apt_terms: Vec<String>,
         azure_tables: Vec<String>,
+    ) -> Self {
+        Self::build_full(source_ids, apt_terms, azure_tables, Vec::new())
+    }
+
+    /// Build with every targeting dimension.
+    pub fn build_full(
+        source_ids: Vec<String>,
+        apt_terms: Vec<String>,
+        azure_tables: Vec<String>,
+        splunk_sourcetypes: Vec<String>,
     ) -> Self {
         let cleaned: Vec<String> = apt_terms
             .into_iter()
@@ -211,6 +227,23 @@ impl CompiledFilter {
 
         let table_sigma_services = crate::azure_tables::sigma_services_for(&azure_tables);
 
+        // Sourcetypes contain ':' '/' ' ' — escape and use boundary classes
+        // that exclude those chars so "pan:traffic" matches whole.
+        let sourcetype_regex = if splunk_sourcetypes.is_empty() {
+            None
+        } else {
+            let patterns: Vec<String> = splunk_sourcetypes
+                .iter()
+                .map(|t| {
+                    format!(
+                        r#"(?i)(^|["'=\s(]){}($|["'\s)|,])"#,
+                        regex::escape(t)
+                    )
+                })
+                .collect();
+            RegexSet::new(&patterns).ok()
+        };
+
         Self {
             source_ids,
             apt_terms: cleaned,
@@ -218,6 +251,8 @@ impl CompiledFilter {
             azure_tables,
             table_regex,
             table_sigma_services,
+            splunk_sourcetypes,
+            sourcetype_regex,
         }
     }
 
@@ -233,8 +268,15 @@ impl CompiledFilter {
         self.table_regex.is_some()
     }
 
+    pub fn sourcetype_filter_active(&self) -> bool {
+        self.sourcetype_regex.is_some()
+    }
+
     pub fn is_noop(&self) -> bool {
-        !self.source_filter_active() && !self.apt_filter_active() && !self.table_filter_active()
+        !self.source_filter_active()
+            && !self.apt_filter_active()
+            && !self.table_filter_active()
+            && !self.sourcetype_filter_active()
     }
 
     fn source_selected(&self, id: &str) -> bool {
@@ -372,7 +414,8 @@ impl CompiledFilter {
     }
 
     fn filter_text_rules(&self, content: &str) -> FilterOutcome {
-        if self.source_filter_active() || self.table_filter_active() {
+        if self.source_filter_active() || self.table_filter_active() || self.sourcetype_filter_active()
+        {
             let mut source_ok = false;
             if self.source_filter_active() {
                 let lower = content.to_lowercase();
@@ -389,8 +432,15 @@ impl CompiledFilter {
                     .as_ref()
                     .map_or(false, |set| set.is_match(content));
 
+            // Sourcetype filter: rule content must reference a selected sourcetype.
+            let sourcetype_ok = self.sourcetype_filter_active()
+                && self
+                    .sourcetype_regex
+                    .as_ref()
+                    .map_or(false, |set| set.is_match(content));
+
             // Strict: no positive match on any active dimension → drop.
-            if !source_ok && !table_ok {
+            if !source_ok && !table_ok && !sourcetype_ok {
                 return FilterOutcome::Drop;
             }
         }
@@ -556,6 +606,43 @@ mod tests {
         ));
         let sigma_kv = "title: t\nlogsource:\n    product: azure\n    service: keyvault\ndetection:\n    sel: x\n";
         assert!(matches!(f.filter_file("Sigma", sigma_kv), FilterOutcome::Drop));
+    }
+
+    #[test]
+    fn splunk_sourcetype_filter() {
+        let f = CompiledFilter::build_full(
+            vec![],
+            vec![],
+            vec![],
+            vec!["pan:traffic".into(), "WinEventLog:Security".into()],
+        );
+        // SPL referencing a selected sourcetype
+        assert!(matches!(
+            f.filter_file(
+                "Splunk",
+                "sourcetype=pan:traffic action=deny | stats count by src_ip"
+            ),
+            FilterOutcome::Keep
+        ));
+        assert!(matches!(
+            f.filter_file("Splunk", "sourcetype=\"WinEventLog:Security\" EventCode=4625"),
+            FilterOutcome::Keep
+        ));
+        // unselected sourcetype only → drop
+        assert!(matches!(
+            f.filter_file("Splunk", "sourcetype=aws:cloudtrail eventName=ConsoleLogin"),
+            FilterOutcome::Drop
+        ));
+        // no sourcetype at all → strict drop
+        assert!(matches!(
+            f.filter_file("Splunk", "index=main | stats count"),
+            FilterOutcome::Drop
+        ));
+        // sibling sourcetype must not match (boundary check)
+        assert!(matches!(
+            f.filter_file("Splunk", "sourcetype=pan:threat"),
+            FilterOutcome::Drop
+        ));
     }
 
     #[test]
