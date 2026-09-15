@@ -1,42 +1,12 @@
 use super::rule_menu::ToolSelectorApp;
 use super::{qradar, sigma, splunk, suricata, sysmon, yara};
+use crate::apt_catalog::{expand_terms, APT_GROUPS};
 use crate::download::render_output_path_selector;
+use crate::filter::{CompiledFilter, LOG_SOURCES};
 use eframe::egui;
 use egui::Margin;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
-use std::thread;
-
-fn run_tool_with_progress<F>(
-    ctx: egui::Context,
-    progress: Arc<Mutex<Option<(usize, usize)>>>,
-    current_file: Arc<Mutex<Option<String>>>,
-    cancel_flag: Arc<Mutex<bool>>, // ← ADD
-    mut tool_fn: F,
-) where
-    F: FnMut(&mut dyn FnMut(usize, usize, String) -> bool) + Send + 'static, // ← returns bool now
-{
-    thread::spawn(move || {
-        let mut update_progress = |current: usize, total: usize, file: String| -> bool {
-            if let Ok(cancelled) = cancel_flag.lock() {
-                if *cancelled {
-                    return false;
-                }
-            }
-
-            if let Ok(mut p) = progress.lock() {
-                *p = Some((current, total));
-            }
-            if let Ok(mut f) = current_file.lock() {
-                *f = Some(file);
-            }
-            ctx.request_repaint();
-            true
-        };
-
-        tool_fn(&mut update_progress);
-    });
-}
+use std::sync::Arc;
 
 pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_menu: impl FnMut()) {
     egui::CentralPanel::default()
@@ -46,8 +16,6 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 .outer_margin(Margin::same(20)),
         )
         .show(ctx, |ui| {
-            let show_progress = false;
-
             if let Ok(mut guard) = app.progress.lock() {
                 if let Some((current, total, ref current_name)) = *guard {
                     let percent = (current as f32 / total.max(1) as f32) * 100.0;
@@ -77,16 +45,12 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 app.cancel_flag.store(true, Ordering::Relaxed);
                             }
                         });
-
-                        return;
-                    } else {
-                        return;
                     }
+                    return;
                 }
             }
 
-            // Only show selectors if not showing progress
-            if !show_progress {
+            egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.heading("Select tools to run:");
 
                 for (i, name) in app.tool_names.iter().enumerate() {
@@ -121,6 +85,90 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         }
                     }
                 }
+
+                // ---------- Log source / table targeting ----------
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
+                ui.heading("Target log sources (optional):");
+                ui.label(
+                    egui::RichText::new(
+                        "Nothing selected = grab everything. Selecting sources keeps only rules \
+                         that positively match them; unclassifiable rules are dropped (strict).",
+                    )
+                    .size(12.0)
+                    .color(egui::Color32::GRAY),
+                );
+                ui.add_space(6.0);
+
+                egui::Grid::new("log_source_grid")
+                    .num_columns(2)
+                    .spacing([40.0, 4.0])
+                    .show(ui, |ui| {
+                        for (i, def) in LOG_SOURCES.iter().enumerate() {
+                            ui.checkbox(&mut app.source_selected[i], def.label);
+                            if (i % 2) == 1 {
+                                ui.end_row();
+                            }
+                        }
+                    });
+
+                // ---------- APT targeting ----------
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
+                ui.heading("Threat actors that target you (optional):");
+                ui.label(
+                    egui::RichText::new(
+                        "Nothing selected = no actor filter. Selecting groups keeps only rules \
+                         mentioning the group, its aliases, or its malware families.",
+                    )
+                    .size(12.0)
+                    .color(egui::Color32::GRAY),
+                );
+                ui.add_space(6.0);
+
+                ui.horizontal(|ui| {
+                    ui.label("Search:");
+                    ui.text_edit_singleline(&mut app.apt_search);
+                    let selected_count = app.apt_selected.iter().filter(|&&v| v).count();
+                    ui.label(format!("{} group(s) selected", selected_count));
+                    if selected_count > 0 && ui.small_button("Clear").clicked() {
+                        for v in app.apt_selected.iter_mut() {
+                            *v = false;
+                        }
+                    }
+                });
+
+                let needle = app.apt_search.to_lowercase();
+                egui::ScrollArea::vertical()
+                    .id_salt("apt_scroll")
+                    .max_height(220.0)
+                    .show(ui, |ui| {
+                        for (i, g) in APT_GROUPS.iter().enumerate() {
+                            if !g.matches_search(&needle) {
+                                continue;
+                            }
+                            let label = format!(
+                                "{} ({}) — {}",
+                                g.name, g.mitre_id, g.origin
+                            );
+                            ui.checkbox(&mut app.apt_selected[i], label)
+                                .on_hover_text(format!(
+                                    "Aliases: {}\nSoftware: {}",
+                                    g.aliases.join(", "),
+                                    g.software.join(", ")
+                                ));
+                        }
+                    });
+
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.label("Extra terms (comma-separated):");
+                    ui.text_edit_singleline(&mut app.apt_custom_terms)
+                        .on_hover_text("Actor or malware names not in the list, e.g. Vidar, RedLine");
+                });
+
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
@@ -138,6 +186,24 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         .custom_path
                         .clone()
                         .unwrap_or_else(|| "./rule_output".to_string());
+
+                    // Build the compiled filter once for this run
+                    let source_ids: Vec<String> = LOG_SOURCES
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.source_selected[*i])
+                        .map(|(_, d)| d.id.to_string())
+                        .collect();
+
+                    let mut apt_terms = expand_terms(&app.apt_selected);
+                    for t in app.apt_custom_terms.split(',') {
+                        let t = t.trim();
+                        if !t.is_empty() {
+                            apt_terms.push(t.to_string());
+                        }
+                    }
+
+                    let filter = Arc::new(CompiledFilter::build(source_ids, apt_terms));
 
                     // Find the "All" index dynamically
                     let all_index = app.tool_names.iter().position(|&x| x == "All");
@@ -187,6 +253,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         let progress_triplet = Arc::clone(&app.progress);
                         let cancel_flag = Arc::clone(&app.cancel_flag);
                         let ctx_clone = ctx.clone();
+                        let filter_clone = Arc::clone(&filter);
 
                         std::thread::spawn(move || match tool {
                             "Yara" => yara::process_yara(
@@ -194,56 +261,62 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 Arc::clone(&progress_triplet),
                                 ctx_clone.clone(),
                                 Arc::clone(&cancel_flag),
+                                filter_clone,
                             ),
                             "Suricata" => suricata::process_suricata(
                                 &out_path,
                                 Arc::clone(&progress_triplet),
                                 ctx_clone.clone(),
                                 Arc::clone(&cancel_flag),
+                                filter_clone,
                             ),
                             "Sigma" => sigma::process_sigma(
                                 &out_path,
                                 Arc::clone(&progress_triplet),
                                 ctx_clone.clone(),
                                 Arc::clone(&cancel_flag),
+                                filter_clone,
                             ),
                             "Splunk" => splunk::process_splunk(
                                 &out_path,
                                 Arc::clone(&progress_triplet),
                                 ctx_clone.clone(),
                                 Arc::clone(&cancel_flag),
+                                filter_clone,
                             ),
                             "QRadar" => qradar::process_qradar(
                                 &out_path,
                                 Arc::clone(&progress_triplet),
                                 ctx_clone.clone(),
                                 Arc::clone(&cancel_flag),
+                                filter_clone,
                             ),
                             "Sysmon" => sysmon::process_sysmon(
                                 &out_path,
                                 Arc::clone(&progress_triplet),
                                 ctx_clone.clone(),
                                 Arc::clone(&cancel_flag),
+                                filter_clone,
                             ),
                             _ => {}
                         });
                     }
                 }
-            }
 
-            ui.add_space(30.0);
-            ui.separator();
-            ui.add_space(40.0);
-            if ui
-                .add(
-                    egui::Button::new(
-                        egui::RichText::new("⬅ Back to Menu").color(egui::Color32::WHITE),
+                ui.add_space(30.0);
+                ui.separator();
+                ui.add_space(40.0);
+                if ui
+                    .add(
+                        egui::Button::new(
+                            egui::RichText::new("⬅ Back to Menu").color(egui::Color32::WHITE),
+                        )
+                        .fill(egui::Color32::from_rgb(255, 140, 0)),
                     )
-                    .fill(egui::Color32::from_rgb(255, 140, 0)),
-                )
-                .clicked()
-            {
-                back_to_menu();
-            }
+                    .clicked()
+                {
+                    back_to_menu();
+                }
+            });
         });
 }

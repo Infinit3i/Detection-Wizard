@@ -23,6 +23,7 @@ pub fn process_qradar(
     progress_triplet: Arc<Mutex<Option<(usize, usize, String)>>>,
     ctx: Context,
     cancel_flag: Arc<AtomicBool>,
+    filter: Arc<crate::filter::CompiledFilter>,
 ) {
     let _ = process_tool(
         &qradar_spec(),
@@ -30,6 +31,7 @@ pub fn process_qradar(
         progress_triplet,
         ctx,
         cancel_flag,
+        filter,
     );
 }
 

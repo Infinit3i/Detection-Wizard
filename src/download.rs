@@ -14,6 +14,8 @@ use std::thread;
 use std::time::Duration;
 use walkdir::WalkDir;
 
+use crate::filter::{CompiledFilter, FilterOutcome};
+
 /// Output format for IOC text aggregations (kept for parity with your existing design)
 #[derive(Clone, Copy)]
 pub enum DownloadFormat {
@@ -48,6 +50,7 @@ pub fn process_tool(
     progress: Arc<Mutex<Option<(usize, usize, String)>>>, // (done, total, current)
     ctx: Context,
     cancel_flag: Arc<AtomicBool>,
+    filter: Arc<CompiledFilter>,
 ) -> io::Result<()> {
     // <output_root>/<tool_subfolder>
     let dest_dir = output_root.join(spec.dest_subfolder);
@@ -76,7 +79,9 @@ pub fn process_tool(
             }
             ctx.request_repaint();
 
-            if let Err(e) = clone_and_copy_filtered(&repo_url, &dest_dir_clone, allowed) {
+            if let Err(e) =
+                clone_and_copy_filtered(&repo_url, &dest_dir_clone, allowed, spec_name, &filter)
+            {
                 eprintln!("[{}] Repo failed {}: {}", spec_name, repo_url, e);
             }
 
@@ -108,7 +113,7 @@ pub fn process_tool(
             }
             ctx.request_repaint();
 
-            match download_url_to_dir(&page_url, &dest_dir_clone, allowed) {
+            match download_url_to_dir(&page_url, &dest_dir_clone, allowed, spec_name, &filter) {
                 Ok(Some(_path)) => {}
                 Ok(None) => {} // filtered or overwrite-skip
                 Err(e) => eprintln!("[{}] URL failed {}: {}", spec_name, page_url, e),
@@ -160,6 +165,8 @@ fn clone_and_copy_filtered(
     repo_url: &str,
     dest_dir: &Path,
     allowed_exts: &[&str],
+    tool_name: &str,
+    filter: &CompiledFilter,
 ) -> io::Result<()> {
     let tmp = tempfile::tempdir()?;
     let tmp_path = tmp.path().to_path_buf(); // kept for post-clone checks
@@ -187,10 +194,16 @@ fn clone_and_copy_filtered(
         ));
     }
 
-    copy_filtered_files(&tmp_path, dest_dir, allowed_exts)
+    copy_filtered_files(&tmp_path, dest_dir, allowed_exts, tool_name, filter)
 }
 
-fn copy_filtered_files(src: &Path, dest_dir: &Path, allowed_exts: &[&str]) -> io::Result<()> {
+fn copy_filtered_files(
+    src: &Path,
+    dest_dir: &Path,
+    allowed_exts: &[&str],
+    tool_name: &str,
+    filter: &CompiledFilter,
+) -> io::Result<()> {
     fs::create_dir_all(dest_dir)?;
 
     for entry in WalkDir::new(src).into_iter().filter_map(Result::ok) {
@@ -208,6 +221,20 @@ fn copy_filtered_files(src: &Path, dest_dir: &Path, allowed_exts: &[&str]) -> io
             continue;
         }
 
+        // Content-based filtering (log sources / APT selection)
+        let mut rewritten: Option<String> = None;
+        if !filter.is_noop() {
+            match fs::read_to_string(path) {
+                Ok(content) => match filter.filter_file(tool_name, &content) {
+                    FilterOutcome::Keep => {}
+                    FilterOutcome::Drop => continue,
+                    FilterOutcome::Rewrite(new_content) => rewritten = Some(new_content),
+                },
+                // Unreadable as UTF-8 → unclassifiable → strict drop
+                Err(_) => continue,
+            }
+        }
+
         // Unique-ish name to avoid collisions: <topdir>_<filename>
         let repo_top = src.file_name().unwrap_or_default().to_string_lossy();
         let unique = format!("{}_{}", sanitize(&repo_top), fname);
@@ -221,8 +248,17 @@ fn copy_filtered_files(src: &Path, dest_dir: &Path, allowed_exts: &[&str]) -> io
             let _ = fs::remove_file(&dest);
         }
 
-        if let Err(e) = fs::copy(path, &dest) {
-            eprintln!("Failed to copy {:?} -> {:?}: {}", path, dest, e);
+        match rewritten {
+            Some(content) => {
+                if let Err(e) = fs::write(&dest, content) {
+                    eprintln!("Failed to write {:?}: {}", dest, e);
+                }
+            }
+            None => {
+                if let Err(e) = fs::copy(path, &dest) {
+                    eprintln!("Failed to copy {:?} -> {:?}: {}", path, dest, e);
+                }
+            }
         }
     }
 
@@ -329,8 +365,8 @@ pub fn download_and_extract_git_repo(
         .map(|e| e.trim_start_matches('.'))
         .into_iter()
         .collect();
-    // Reuse the internal helper
-    clone_and_copy_filtered(repo_url, output_path, &allowed)
+    // Reuse the internal helper (no content filtering in this legacy path)
+    clone_and_copy_filtered(repo_url, output_path, &allowed, "", &CompiledFilter::none())
 }
 
 pub fn download_files_with_progress(
@@ -346,7 +382,8 @@ pub fn download_files_with_progress(
         .collect();
 
     for url in urls {
-        if let Err(e) = download_url_to_dir(url, output_path, &allowed) {
+        if let Err(e) = download_url_to_dir(url, output_path, &allowed, "", &CompiledFilter::none())
+        {
             eprintln!("download {} failed: {}", url, e);
         }
     }
@@ -467,6 +504,8 @@ fn download_url_to_dir(
     url: &str,
     dest_dir: &Path,
     allowed_exts: &[&str],
+    tool_name: &str,
+    filter: &CompiledFilter,
 ) -> io::Result<Option<PathBuf>> {
     fs::create_dir_all(dest_dir)?;
 
@@ -496,9 +535,19 @@ fn download_url_to_dir(
 
     let tmp_dir = tempdir_in(dest_dir)?;
     let tmp_path = tmp_dir.path().join(format!("{}.part", file_name));
-    let text = resp
+    let mut text = resp
         .text()
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+    // Content-based filtering (log sources / APT selection)
+    if !filter.is_noop() {
+        match filter.filter_file(tool_name, &text) {
+            FilterOutcome::Keep => {}
+            FilterOutcome::Drop => return Ok(None),
+            FilterOutcome::Rewrite(new_content) => text = new_content,
+        }
+    }
+
     fs::write(&tmp_path, text.as_bytes())?;
     fs::rename(&tmp_path, &final_path)?;
 
@@ -540,13 +589,17 @@ pub fn process_sources(
         let finished = if let Some(secs) = repo_timeout_secs {
             run_with_timeout(Duration::from_secs(secs), move || {
                 let exts_as_str: Vec<&str> = exts_owned.iter().map(|s| s.as_str()).collect();
-                if let Err(e) = clone_and_copy_filtered(&repo, &dest, &exts_as_str) {
+                if let Err(e) =
+                    clone_and_copy_filtered(&repo, &dest, &exts_as_str, "", &CompiledFilter::none())
+                {
                     eprintln!("❌ Repo {} failed: {}", repo, e);
                 }
             })
         } else {
             let exts_as_str: Vec<&str> = exts_owned.iter().map(|s| s.as_str()).collect();
-            if let Err(e) = clone_and_copy_filtered(&repo, &dest, &exts_as_str) {
+            if let Err(e) =
+                clone_and_copy_filtered(&repo, &dest, &exts_as_str, "", &CompiledFilter::none())
+            {
                 eprintln!("❌ Repo {} failed: {}", repo, e);
             }
             true
