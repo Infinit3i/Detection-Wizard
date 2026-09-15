@@ -1,4 +1,5 @@
 use crate::apt_catalog::APT_GROUPS;
+use crate::azure_tables::AZURE_TABLES;
 use crate::filter::LOG_SOURCES;
 use eframe::{egui, App, Frame};
 use std::sync::atomic::AtomicBool;
@@ -22,6 +23,14 @@ pub struct ToolSelectorApp {
     pub apt_search: String,
     /// extra comma-separated free-text terms (actor/malware names not in the catalog)
     pub apt_custom_terms: String,
+
+    // --- Targeting: granular Azure/M365 log tables ---
+    /// parallel to crate::azure_tables::AZURE_TABLES; all false = table filter off
+    pub azure_table_selected: Vec<bool>,
+    /// live search box for the table list
+    pub azure_table_search: String,
+    /// show/hide the Azure table picker section
+    pub azure_tables_open: bool,
 }
 
 impl Default for ToolSelectorApp {
@@ -36,6 +45,9 @@ impl Default for ToolSelectorApp {
             apt_selected: vec![false; APT_GROUPS.len()],
             apt_search: String::new(),
             apt_custom_terms: String::new(),
+            azure_table_selected: vec![false; AZURE_TABLES.len()],
+            azure_table_search: String::new(),
+            azure_tables_open: false,
         }
     }
 }

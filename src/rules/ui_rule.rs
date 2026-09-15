@@ -1,6 +1,7 @@
 use super::rule_menu::ToolSelectorApp;
 use super::{qradar, sigma, splunk, suricata, sysmon, yara};
 use crate::apt_catalog::{expand_terms, APT_GROUPS};
+use crate::azure_tables::AZURE_TABLES;
 use crate::download::render_output_path_selector;
 use crate::filter::{CompiledFilter, LOG_SOURCES};
 use eframe::egui;
@@ -113,6 +114,83 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         }
                     });
 
+                // ---------- Granular Azure / M365 table targeting ----------
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
+                let table_count = app.azure_table_selected.iter().filter(|&&v| v).count();
+                let header = if table_count > 0 {
+                    format!("Azure / M365 log tables ({} selected)", table_count)
+                } else {
+                    "Azure / M365 log tables (optional, none selected)".to_string()
+                };
+                egui::CollapsingHeader::new(header)
+                    .id_salt("azure_tables_header")
+                    .default_open(app.azure_tables_open)
+                    .show(ui, |ui| {
+                        ui.label(
+                            egui::RichText::new(
+                                "Pick the exact Log Analytics / Sentinel / Defender tables you \
+                                 ingest. Selecting any table keeps only rules that reference a \
+                                 selected table (or whose sigma logsource maps to one).",
+                            )
+                            .size(12.0)
+                            .color(egui::Color32::GRAY),
+                        );
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Search:");
+                            ui.text_edit_singleline(&mut app.azure_table_search);
+                            if table_count > 0 && ui.small_button("Clear").clicked() {
+                                for v in app.azure_table_selected.iter_mut() {
+                                    *v = false;
+                                }
+                            }
+                        });
+                        ui.add_space(4.0);
+
+                        let needle = app.azure_table_search.to_lowercase();
+                        egui::ScrollArea::vertical()
+                            .id_salt("azure_table_scroll")
+                            .max_height(260.0)
+                            .show(ui, |ui| {
+                                let mut last_category = "";
+                                for (i, def) in AZURE_TABLES.iter().enumerate() {
+                                    if !needle.is_empty()
+                                        && !def.name.to_lowercase().contains(&needle)
+                                        && !def.category.to_lowercase().contains(&needle)
+                                    {
+                                        continue;
+                                    }
+                                    if def.category != last_category {
+                                        ui.add_space(6.0);
+                                        ui.label(
+                                            egui::RichText::new(def.category)
+                                                .strong()
+                                                .size(13.0),
+                                        );
+                                        last_category = def.category;
+                                    }
+                                    // "Select all in category" convenience row
+                                    ui.checkbox(&mut app.azure_table_selected[i], def.name);
+                                }
+                            });
+
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            if ui.small_button("Select all visible").clicked() {
+                                for (i, def) in AZURE_TABLES.iter().enumerate() {
+                                    if needle.is_empty()
+                                        || def.name.to_lowercase().contains(&needle)
+                                        || def.category.to_lowercase().contains(&needle)
+                                    {
+                                        app.azure_table_selected[i] = true;
+                                    }
+                                }
+                            }
+                        });
+                    });
+
                 // ---------- APT targeting ----------
                 ui.add_space(10.0);
                 ui.separator();
@@ -203,7 +281,18 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         }
                     }
 
-                    let filter = Arc::new(CompiledFilter::build(source_ids, apt_terms));
+                    let selected_tables: Vec<String> = AZURE_TABLES
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.azure_table_selected[*i])
+                        .map(|(_, d)| d.name.to_string())
+                        .collect();
+
+                    let filter = Arc::new(CompiledFilter::build_with_tables(
+                        source_ids,
+                        apt_terms,
+                        selected_tables,
+                    ));
 
                     // Find the "All" index dynamically
                     let all_index = app.tool_names.iter().position(|&x| x == "All");

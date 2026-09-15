@@ -138,6 +138,12 @@ pub struct CompiledFilter {
     pub apt_terms: Vec<String>,
     /// case-insensitive word-boundary matcher over apt_terms; None = APT filter inactive
     apt_regex: Option<RegexSet>,
+    /// selected Azure/M365 table names (granular targeting); empty = inactive
+    pub azure_tables: Vec<String>,
+    /// case-insensitive word-boundary matcher over azure_tables
+    table_regex: Option<RegexSet>,
+    /// sigma logsource.service values the selected tables map to
+    table_sigma_services: Vec<String>,
 }
 
 /// Generic software/tool names that appear in MITRE "uses" relationships but
@@ -157,19 +163,28 @@ impl CompiledFilter {
             source_ids: Vec::new(),
             apt_terms: Vec::new(),
             apt_regex: None,
+            azure_tables: Vec::new(),
+            table_regex: None,
+            table_sigma_services: Vec::new(),
         }
     }
 
     /// Build from UI selections. `apt_terms` should already be the expanded
     /// list (group names + aliases + software) from the MITRE catalog.
     pub fn build(source_ids: Vec<String>, apt_terms: Vec<String>) -> Self {
+        Self::build_with_tables(source_ids, apt_terms, Vec::new())
+    }
+
+    /// Build including granular Azure/M365 table targeting.
+    pub fn build_with_tables(
+        source_ids: Vec<String>,
+        apt_terms: Vec<String>,
+        azure_tables: Vec<String>,
+    ) -> Self {
         let cleaned: Vec<String> = apt_terms
             .into_iter()
             .map(|t| t.trim().to_string())
-            .filter(|t| {
-                t.len() >= 3
-                    && !TERM_BLACKLIST.contains(&t.to_lowercase().as_str())
-            })
+            .filter(|t| t.len() >= 3 && !TERM_BLACKLIST.contains(&t.to_lowercase().as_str()))
             .collect();
 
         let apt_regex = if cleaned.is_empty() {
@@ -179,20 +194,30 @@ impl CompiledFilter {
             // and \b treats '_' as a word char, so use explicit non-alnum boundaries.
             let patterns: Vec<String> = cleaned
                 .iter()
-                .map(|t| {
-                    format!(
-                        r"(?i)(^|[^A-Za-z0-9]){}([^A-Za-z0-9]|$)",
-                        regex::escape(t)
-                    )
-                })
+                .map(|t| format!(r"(?i)(^|[^A-Za-z0-9]){}([^A-Za-z0-9]|$)", regex::escape(t)))
                 .collect();
             RegexSet::new(&patterns).ok()
         };
+
+        let table_regex = if azure_tables.is_empty() {
+            None
+        } else {
+            let patterns: Vec<String> = azure_tables
+                .iter()
+                .map(|t| format!(r"(?i)(^|[^A-Za-z0-9_]){}([^A-Za-z0-9_]|$)", regex::escape(t)))
+                .collect();
+            RegexSet::new(&patterns).ok()
+        };
+
+        let table_sigma_services = crate::azure_tables::sigma_services_for(&azure_tables);
 
         Self {
             source_ids,
             apt_terms: cleaned,
             apt_regex,
+            azure_tables,
+            table_regex,
+            table_sigma_services,
         }
     }
 
@@ -204,8 +229,12 @@ impl CompiledFilter {
         self.apt_regex.is_some()
     }
 
+    pub fn table_filter_active(&self) -> bool {
+        self.table_regex.is_some()
+    }
+
     pub fn is_noop(&self) -> bool {
-        !self.source_filter_active() && !self.apt_filter_active()
+        !self.source_filter_active() && !self.apt_filter_active() && !self.table_filter_active()
     }
 
     fn source_selected(&self, id: &str) -> bool {
@@ -214,6 +243,15 @@ impl CompiledFilter {
 
     fn matches_apt(&self, text: &str) -> bool {
         match &self.apt_regex {
+            Some(set) => set.is_match(text),
+            None => true,
+        }
+    }
+
+    /// Text mentions at least one selected Azure table (or filter inactive).
+    #[allow(dead_code)]
+    fn matches_table(&self, text: &str) -> bool {
+        match &self.table_regex {
             Some(set) => set.is_match(text),
             None => true,
         }
@@ -252,23 +290,54 @@ impl CompiledFilter {
     }
 
     fn filter_sigma(&self, content: &str) -> FilterOutcome {
-        if self.source_filter_active() {
+        // Source/table dimension: pass if the rule matches a selected coarse
+        // source OR maps to a selected Azure/M365 table (when those filters
+        // are active). Strict: no positive match on any active dimension → drop.
+        if self.source_filter_active() || self.table_filter_active() {
             let (product, service, category) = parse_sigma_logsource(content);
-            let mut matched = false;
-            for def in LOG_SOURCES {
-                if !self.source_selected(def.id) {
-                    continue;
-                }
-                let p = product.as_deref().map_or(false, |v| def.sigma_products.contains(&v));
-                let s = service.as_deref().map_or(false, |v| def.sigma_services.contains(&v));
-                let c = category.as_deref().map_or(false, |v| def.sigma_categories.contains(&v));
-                if p || s || c {
-                    matched = true;
-                    break;
+
+            let mut source_ok = false;
+            if self.source_filter_active() {
+                for def in LOG_SOURCES {
+                    if !self.source_selected(def.id) {
+                        continue;
+                    }
+                    let p = product
+                        .as_deref()
+                        .map_or(false, |v| def.sigma_products.contains(&v));
+                    let s = service
+                        .as_deref()
+                        .map_or(false, |v| def.sigma_services.contains(&v));
+                    let c = category
+                        .as_deref()
+                        .map_or(false, |v| def.sigma_categories.contains(&v));
+                    if p || s || c {
+                        source_ok = true;
+                        break;
+                    }
                 }
             }
-            // Strict: unknown/unmapped logsource → drop.
-            if !matched {
+
+            let mut table_ok = false;
+            if self.table_filter_active() {
+                // azure/m365 sigma rules: logsource.service must map to a
+                // selected table; any rule mentioning a selected table name
+                // in its content also qualifies.
+                let is_azure = matches!(product.as_deref(), Some("azure") | Some("m365") | Some("microsoft365"));
+                if is_azure {
+                    if let Some(svc) = service.as_deref() {
+                        table_ok = self.table_sigma_services.iter().any(|s| s == svc);
+                    }
+                }
+                if !table_ok && self.table_regex.is_some() {
+                    table_ok = self
+                        .table_regex
+                        .as_ref()
+                        .map_or(false, |set| set.is_match(content));
+                }
+            }
+
+            if !source_ok && !table_ok {
                 return FilterOutcome::Drop;
             }
         }
@@ -303,14 +372,25 @@ impl CompiledFilter {
     }
 
     fn filter_text_rules(&self, content: &str) -> FilterOutcome {
-        if self.source_filter_active() {
-            let lower = content.to_lowercase();
-            let matched = LOG_SOURCES
-                .iter()
-                .filter(|d| self.source_selected(d.id))
-                .any(|d| d.keywords.iter().any(|k| lower.contains(k)));
-            // Strict: no classifiable source keyword → drop.
-            if !matched {
+        if self.source_filter_active() || self.table_filter_active() {
+            let mut source_ok = false;
+            if self.source_filter_active() {
+                let lower = content.to_lowercase();
+                source_ok = LOG_SOURCES
+                    .iter()
+                    .filter(|d| self.source_selected(d.id))
+                    .any(|d| d.keywords.iter().any(|k| lower.contains(k)));
+            }
+
+            // Table filter: rule content must reference a selected table name.
+            let table_ok = self.table_filter_active()
+                && self
+                    .table_regex
+                    .as_ref()
+                    .map_or(false, |set| set.is_match(content));
+
+            // Strict: no positive match on any active dimension → drop.
+            if !source_ok && !table_ok {
                 return FilterOutcome::Drop;
             }
         }
@@ -431,8 +511,68 @@ mod tests {
     #[test]
     fn word_boundary_matching() {
         let f = CompiledFilter::build(vec![], vec!["APT28".into()]);
-        assert!(matches!(f.filter_file("Yara", "rule APT28_zebrocy {}"), FilterOutcome::Keep));
+        assert!(matches!(
+            f.filter_file("Yara", "rule APT28_zebrocy {}"),
+            FilterOutcome::Keep
+        ));
         let f2 = CompiledFilter::build(vec![], vec!["Ke3chang".into()]);
-        assert!(matches!(f2.filter_file("Yara", "rule unrelated {}"), FilterOutcome::Drop));
+        assert!(matches!(
+            f2.filter_file("Yara", "rule unrelated {}"),
+            FilterOutcome::Drop
+        ));
+    }
+
+    #[test]
+    fn azure_table_filter_text_rules() {
+        let f = CompiledFilter::build_with_tables(
+            vec![],
+            vec![],
+            vec!["SigninLogs".into(), "OfficeActivity".into()],
+        );
+        // KQL/Splunk-style rule referencing a selected table
+        assert!(matches!(
+            f.filter_file("Splunk", "SigninLogs | where ResultType != 0"),
+            FilterOutcome::Keep
+        ));
+        // references an unselected table only
+        assert!(matches!(
+            f.filter_file("Splunk", "DeviceProcessEvents | where FileName == \"mimikatz.exe\""),
+            FilterOutcome::Drop
+        ));
+        // no table reference at all → strict drop
+        assert!(matches!(
+            f.filter_file("QRadar", "SELECT * FROM events WHERE severity > 5"),
+            FilterOutcome::Drop
+        ));
+    }
+
+    #[test]
+    fn azure_table_filter_sigma_service_mapping() {
+        let f = CompiledFilter::build_with_tables(vec![], vec![], vec!["SigninLogs".into()]);
+        let sigma_signin = "title: t\nlogsource:\n    product: azure\n    service: signinlogs\ndetection:\n    sel: x\n";
+        assert!(matches!(
+            f.filter_file("Sigma", sigma_signin),
+            FilterOutcome::Keep
+        ));
+        let sigma_kv = "title: t\nlogsource:\n    product: azure\n    service: keyvault\ndetection:\n    sel: x\n";
+        assert!(matches!(f.filter_file("Sigma", sigma_kv), FilterOutcome::Drop));
+    }
+
+    #[test]
+    fn table_and_source_are_or_combined() {
+        // Windows source + SigninLogs table: a windows sigma rule passes via
+        // source, an azure signin rule passes via table.
+        let f = CompiledFilter::build_with_tables(
+            vec!["windows".into()],
+            vec![],
+            vec!["SigninLogs".into()],
+        );
+        assert!(matches!(f.filter_file("Sigma", SIGMA_WIN), FilterOutcome::Keep));
+        let sigma_signin = "title: t\nlogsource:\n    product: azure\n    service: signinlogs\ndetection:\n    sel: x\n";
+        assert!(matches!(
+            f.filter_file("Sigma", sigma_signin),
+            FilterOutcome::Keep
+        ));
+        assert!(matches!(f.filter_file("Sigma", SIGMA_AWS), FilterOutcome::Drop));
     }
 }
