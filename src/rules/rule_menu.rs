@@ -40,6 +40,10 @@ pub struct ToolSelectorApp {
     pub sourcetype_search: String,
     /// show/hide the Splunk sourcetype picker section
     pub sourcetypes_open: bool,
+
+    // --- Targeting: MITRE ATT&CK techniques ---
+    /// comma/space-separated T-codes, e.g. "T1059, T1566.001"
+    pub technique_input: String,
 }
 
 impl Default for ToolSelectorApp {
@@ -60,6 +64,7 @@ impl Default for ToolSelectorApp {
             sourcetype_selected: vec![false; SPLUNK_SOURCETYPES.len()],
             sourcetype_search: String::new(),
             sourcetypes_open: false,
+            technique_input: String::new(),
         }
     }
 }

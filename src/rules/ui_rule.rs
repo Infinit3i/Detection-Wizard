@@ -321,6 +321,27 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         .on_hover_text("Actor or malware names not in the list, e.g. Vidar, RedLine");
                 });
 
+                // ---------- ATT&CK technique targeting ----------
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
+                ui.heading("MITRE ATT&CK techniques (optional):");
+                ui.label(
+                    egui::RichText::new(
+                        "Comma-separated T-codes, e.g. T1059, T1566.001. A parent code also \
+                         keeps its subtechniques (T1059 keeps T1059.001). Only rules that \
+                         reference a listed technique are kept.",
+                    )
+                    .size(12.0)
+                    .color(egui::Color32::GRAY),
+                );
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    ui.label("T-codes:");
+                    ui.text_edit_singleline(&mut app.technique_input)
+                        .on_hover_text("e.g. T1059, T1021.001, T1566");
+                });
+
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
@@ -369,11 +390,19 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         .map(|(_, d)| d.name.to_string())
                         .collect();
 
+                    let technique_ids: Vec<String> = app
+                        .technique_input
+                        .split([',', ' ', ';'])
+                        .map(|t| t.trim().to_string())
+                        .filter(|t| !t.is_empty())
+                        .collect();
+
                     let filter = Arc::new(CompiledFilter::build_full(
                         source_ids,
                         apt_terms,
                         selected_tables,
                         selected_sourcetypes,
+                        technique_ids,
                     ));
 
                     // Find the "All" index dynamically

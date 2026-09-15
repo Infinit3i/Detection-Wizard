@@ -4,7 +4,7 @@
 //! positively classified as matching is DROPPED (tight, curated output).
 //! A filter with no selections is inactive and passes everything.
 
-use regex::RegexSet;
+use regex::{Regex, RegexSet};
 
 /// One selectable log source / table category.
 pub struct LogSourceDef {
@@ -148,6 +148,10 @@ pub struct CompiledFilter {
     pub splunk_sourcetypes: Vec<String>,
     /// case-insensitive boundary-aware matcher over splunk_sourcetypes
     sourcetype_regex: Option<RegexSet>,
+    /// normalized MITRE ATT&CK technique IDs (e.g. "T1059", "T1566.001"); empty = inactive
+    pub technique_ids: Vec<String>,
+    /// matcher over technique_ids; parent codes also match their subtechniques
+    technique_regex: Option<RegexSet>,
 }
 
 /// Generic software/tool names that appear in MITRE "uses" relationships but
@@ -172,13 +176,15 @@ impl CompiledFilter {
             table_sigma_services: Vec::new(),
             splunk_sourcetypes: Vec::new(),
             sourcetype_regex: None,
+            technique_ids: Vec::new(),
+            technique_regex: None,
         }
     }
 
     /// Build from UI selections. `apt_terms` should already be the expanded
     /// list (group names + aliases + software) from the MITRE catalog.
     pub fn build(source_ids: Vec<String>, apt_terms: Vec<String>) -> Self {
-        Self::build_full(source_ids, apt_terms, Vec::new(), Vec::new())
+        Self::build_full(source_ids, apt_terms, Vec::new(), Vec::new(), Vec::new())
     }
 
     /// Build including granular Azure/M365 table targeting.
@@ -187,15 +193,17 @@ impl CompiledFilter {
         apt_terms: Vec<String>,
         azure_tables: Vec<String>,
     ) -> Self {
-        Self::build_full(source_ids, apt_terms, azure_tables, Vec::new())
+        Self::build_full(source_ids, apt_terms, azure_tables, Vec::new(), Vec::new())
     }
 
-    /// Build with every targeting dimension.
+    /// Build with every targeting dimension. `technique_ids` are raw user
+    /// input ("t1059", "T1566.001 ") — normalized and validated here.
     pub fn build_full(
         source_ids: Vec<String>,
         apt_terms: Vec<String>,
         azure_tables: Vec<String>,
         splunk_sourcetypes: Vec<String>,
+        technique_ids: Vec<String>,
     ) -> Self {
         let cleaned: Vec<String> = apt_terms
             .into_iter()
@@ -244,6 +252,33 @@ impl CompiledFilter {
             RegexSet::new(&patterns).ok()
         };
 
+        // Normalize + validate technique IDs: "t1059 " → "T1059"; parent codes
+        // also match subtechniques (T1059 keeps attack.t1059.001).
+        let tech_re = Regex::new(r"(?i)^t\d{4}(\.\d{3})?$").unwrap();
+        let technique_ids: Vec<String> = technique_ids
+            .into_iter()
+            .map(|t| t.trim().to_uppercase())
+            .filter(|t| tech_re.is_match(t))
+            .collect();
+
+        let technique_regex = if technique_ids.is_empty() {
+            None
+        } else {
+            let patterns: Vec<String> = technique_ids
+                .iter()
+                .map(|t| {
+                    if t.contains('.') {
+                        // exact subtechnique
+                        format!(r"(?i)(^|[^A-Za-z0-9]){}($|[^0-9])", regex::escape(t))
+                    } else {
+                        // parent: match itself and any .NNN subtechnique
+                        format!(r"(?i)(^|[^A-Za-z0-9]){}(\.\d{{3}})?($|[^0-9.])", regex::escape(t))
+                    }
+                })
+                .collect();
+            RegexSet::new(&patterns).ok()
+        };
+
         Self {
             source_ids,
             apt_terms: cleaned,
@@ -253,6 +288,8 @@ impl CompiledFilter {
             table_sigma_services,
             splunk_sourcetypes,
             sourcetype_regex,
+            technique_ids,
+            technique_regex,
         }
     }
 
@@ -272,11 +309,16 @@ impl CompiledFilter {
         self.sourcetype_regex.is_some()
     }
 
+    pub fn technique_filter_active(&self) -> bool {
+        self.technique_regex.is_some()
+    }
+
     pub fn is_noop(&self) -> bool {
         !self.source_filter_active()
             && !self.apt_filter_active()
             && !self.table_filter_active()
             && !self.sourcetype_filter_active()
+            && !self.technique_filter_active()
     }
 
     fn source_selected(&self, id: &str) -> bool {
@@ -285,6 +327,14 @@ impl CompiledFilter {
 
     fn matches_apt(&self, text: &str) -> bool {
         match &self.apt_regex {
+            Some(set) => set.is_match(text),
+            None => true,
+        }
+    }
+
+    /// Text references at least one selected ATT&CK technique (or filter inactive).
+    fn matches_technique(&self, text: &str) -> bool {
+        match &self.technique_regex {
             Some(set) => set.is_match(text),
             None => true,
         }
@@ -309,8 +359,9 @@ impl CompiledFilter {
         match tool {
             "Sigma" => self.filter_sigma(content),
             "Yara" => {
-                // YARA scans files/memory, not log tables: only the APT filter applies.
-                if self.matches_apt(content) {
+                // YARA scans files/memory, not log tables: only the APT and
+                // technique filters apply.
+                if self.matches_apt(content) && self.matches_technique(content) {
                     FilterOutcome::Keep
                 } else {
                     FilterOutcome::Drop
@@ -387,6 +438,9 @@ impl CompiledFilter {
         if !self.matches_apt(content) {
             return FilterOutcome::Drop;
         }
+        if !self.matches_technique(content) {
+            return FilterOutcome::Drop;
+        }
         FilterOutcome::Keep
     }
 
@@ -395,15 +449,18 @@ impl CompiledFilter {
         if self.source_filter_active() && !self.source_selected("network") {
             return FilterOutcome::Drop;
         }
-        if !self.apt_filter_active() {
+        if !self.apt_filter_active() && !self.technique_filter_active() {
             return FilterOutcome::Keep;
         }
-        // One rule per line: keep only APT-matching rules (plus comments they sit under).
+        // One rule per line: keep only matching rules (plus comments they sit under).
         let kept: Vec<&str> = content
             .lines()
             .filter(|line| {
                 let t = line.trim();
-                !t.is_empty() && !t.starts_with('#') && self.matches_apt(line)
+                !t.is_empty()
+                    && !t.starts_with('#')
+                    && self.matches_apt(line)
+                    && self.matches_technique(line)
             })
             .collect();
         if kept.is_empty() {
@@ -445,6 +502,9 @@ impl CompiledFilter {
             }
         }
         if !self.matches_apt(content) {
+            return FilterOutcome::Drop;
+        }
+        if !self.matches_technique(content) {
             return FilterOutcome::Drop;
         }
         FilterOutcome::Keep
@@ -615,6 +675,7 @@ mod tests {
             vec![],
             vec![],
             vec!["pan:traffic".into(), "WinEventLog:Security".into()],
+            vec![],
         );
         // SPL referencing a selected sourcetype
         assert!(matches!(
@@ -641,6 +702,53 @@ mod tests {
         // sibling sourcetype must not match (boundary check)
         assert!(matches!(
             f.filter_file("Splunk", "sourcetype=pan:threat"),
+            FilterOutcome::Drop
+        ));
+    }
+
+    #[test]
+    fn technique_filter() {
+        // lowercase input is normalized; junk is dropped
+        let f = CompiledFilter::build_full(
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec!["t1059".into(), "T1566.001".into(), "banana".into()],
+        );
+        assert_eq!(f.technique_ids, vec!["T1059", "T1566.001"]);
+        // sigma tag style: parent matches subtechnique
+        let sigma = "title: t\ntags:\n    - attack.t1059.001\ndetection:\n    sel: x\n";
+        assert!(matches!(f.filter_file("Sigma", sigma), FilterOutcome::Keep));
+        // exact subtechnique match
+        assert!(matches!(
+            f.filter_file("Splunk", "annotations: mitre_attack: T1566.001"),
+            FilterOutcome::Keep
+        ));
+        // sibling subtechnique of an exact selection must not match
+        let f2 = CompiledFilter::build_full(
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec!["T1566.001".into()],
+        );
+        assert!(matches!(
+            f2.filter_file("Splunk", "mitre: T1566.002"),
+            FilterOutcome::Drop
+        ));
+        // T1059 must not match T1059000-style garbage or unrelated codes
+        assert!(matches!(
+            f.filter_file("Splunk", "search for T1027 obfuscation"),
+            FilterOutcome::Drop
+        ));
+        // yara: technique in metadata keeps the rule
+        assert!(matches!(
+            f.filter_file("Yara", "rule x { meta: mitre = \"T1059\" }"),
+            FilterOutcome::Keep
+        ));
+        assert!(matches!(
+            f.filter_file("Yara", "rule y { strings: $a = \"z\" }"),
             FilterOutcome::Drop
         ));
     }
