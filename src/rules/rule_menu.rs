@@ -2,6 +2,7 @@ use crate::apt_catalog::APT_GROUPS;
 use crate::azure_tables::AZURE_TABLES;
 use crate::filter::LOG_SOURCES;
 use crate::splunk_sourcetypes::SPLUNK_SOURCETYPES;
+use crate::ttp_catalog::TTP_CATALOG;
 use eframe::{egui, App, Frame};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
@@ -16,6 +17,8 @@ pub struct ToolSelectorApp {
     // --- Targeting: log sources / tables ---
     /// parallel to crate::filter::LOG_SOURCES; all false = no source filter (grab everything)
     pub source_selected: Vec<bool>,
+    /// live search box for the log source list
+    pub source_search: String,
 
     // --- Targeting: APT groups ---
     /// parallel to crate::apt_catalog::APT_GROUPS; all false = no APT filter
@@ -42,7 +45,11 @@ pub struct ToolSelectorApp {
     pub sourcetypes_open: bool,
 
     // --- Targeting: MITRE ATT&CK techniques ---
-    /// comma/space-separated T-codes, e.g. "T1059, T1566.001"
+    /// parallel to crate::ttp_catalog::TTP_CATALOG; all false = no TTP filter
+    pub ttp_selected: Vec<bool>,
+    /// live search box for the TTP list
+    pub ttp_search: String,
+    /// extra comma/space-separated T-codes not in the catalog
     pub technique_input: String,
 }
 
@@ -55,6 +62,7 @@ impl Default for ToolSelectorApp {
             custom_path: None,
             cancel_flag: Arc::new(AtomicBool::new(false)),
             source_selected: vec![false; LOG_SOURCES.len()],
+            source_search: String::new(),
             apt_selected: vec![false; APT_GROUPS.len()],
             apt_search: String::new(),
             apt_custom_terms: String::new(),
@@ -64,6 +72,8 @@ impl Default for ToolSelectorApp {
             sourcetype_selected: vec![false; SPLUNK_SOURCETYPES.len()],
             sourcetype_search: String::new(),
             sourcetypes_open: false,
+            ttp_selected: vec![false; TTP_CATALOG.len()],
+            ttp_search: String::new(),
             technique_input: String::new(),
         }
     }

@@ -5,6 +5,7 @@ use crate::azure_tables::AZURE_TABLES;
 use crate::download::render_output_path_selector;
 use crate::filter::{CompiledFilter, LOG_SOURCES};
 use crate::splunk_sourcetypes::SPLUNK_SOURCETYPES;
+use crate::ttp_catalog::TTP_CATALOG;
 use eframe::egui;
 use egui::Margin;
 use std::sync::atomic::Ordering;
@@ -88,30 +89,49 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     }
                 }
 
-                // ---------- Log source / table targeting ----------
+                // ---------- Log source targeting ----------
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
-                ui.heading("Target log sources (optional):");
-                ui.label(
-                    egui::RichText::new(
-                        "Nothing selected = grab everything. Selecting sources keeps only rules \
-                         that positively match them; unclassifiable rules are dropped (strict).",
-                    )
-                    .size(12.0)
-                    .color(egui::Color32::GRAY),
-                );
-                ui.add_space(6.0);
-
-                egui::Grid::new("log_source_grid")
-                    .num_columns(2)
-                    .spacing([40.0, 4.0])
+                let src_count = app.source_selected.iter().filter(|&&v| v).count();
+                let src_header = if src_count > 0 {
+                    format!("Log sources ({} selected)", src_count)
+                } else {
+                    "Log sources (all included)".to_string()
+                };
+                egui::CollapsingHeader::new(src_header)
+                    .id_salt("log_sources_header")
                     .show(ui, |ui| {
-                        for (i, def) in LOG_SOURCES.iter().enumerate() {
-                            ui.checkbox(&mut app.source_selected[i], def.label);
-                            if (i % 2) == 1 {
-                                ui.end_row();
+                        ui.label(
+                            egui::RichText::new(
+                                "Nothing selected = all log sources included. Selecting sources \
+                                 keeps only rules that positively match them; unclassifiable \
+                                 rules are dropped (strict).",
+                            )
+                            .size(12.0)
+                            .color(egui::Color32::GRAY),
+                        );
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Search:");
+                            ui.text_edit_singleline(&mut app.source_search);
+                            if src_count > 0 && ui.small_button("Clear").clicked() {
+                                for v in app.source_selected.iter_mut() {
+                                    *v = false;
+                                }
                             }
+                        });
+                        ui.add_space(4.0);
+
+                        let src_needle = app.source_search.to_lowercase();
+                        for (i, def) in LOG_SOURCES.iter().enumerate() {
+                            if !src_needle.is_empty()
+                                && !def.label.to_lowercase().contains(&src_needle)
+                                && !def.id.to_lowercase().contains(&src_needle)
+                            {
+                                continue;
+                            }
+                            ui.checkbox(&mut app.source_selected[i], def.label);
                         }
                     });
 
@@ -123,7 +143,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 let header = if table_count > 0 {
                     format!("Azure / M365 log tables ({} selected)", table_count)
                 } else {
-                    "Azure / M365 log tables (optional, none selected)".to_string()
+                    "Azure / M365 log tables (all included)".to_string()
                 };
                 egui::CollapsingHeader::new(header)
                     .id_salt("azure_tables_header")
@@ -200,7 +220,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 let st_header = if st_count > 0 {
                     format!("Splunk sourcetypes ({} selected)", st_count)
                 } else {
-                    "Splunk sourcetypes (optional, none selected)".to_string()
+                    "Splunk sourcetypes (all included)".to_string()
                 };
                 egui::CollapsingHeader::new(st_header)
                     .id_salt("splunk_sourcetypes_header")
@@ -269,78 +289,141 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
-                ui.heading("Threat actors that target you (optional):");
-                ui.label(
-                    egui::RichText::new(
-                        "Nothing selected = no actor filter. Selecting groups keeps only rules \
-                         mentioning the group, its aliases, or its malware families.",
-                    )
-                    .size(12.0)
-                    .color(egui::Color32::GRAY),
-                );
-                ui.add_space(6.0);
-
-                ui.horizontal(|ui| {
-                    ui.label("Search:");
-                    ui.text_edit_singleline(&mut app.apt_search);
-                    let selected_count = app.apt_selected.iter().filter(|&&v| v).count();
-                    ui.label(format!("{} group(s) selected", selected_count));
-                    if selected_count > 0 && ui.small_button("Clear").clicked() {
-                        for v in app.apt_selected.iter_mut() {
-                            *v = false;
-                        }
-                    }
-                });
-
-                let needle = app.apt_search.to_lowercase();
-                egui::ScrollArea::vertical()
-                    .id_salt("apt_scroll")
-                    .max_height(220.0)
+                let apt_count = app.apt_selected.iter().filter(|&&v| v).count();
+                let apt_header = if apt_count > 0 {
+                    format!("Threat actors / APT groups ({} selected)", apt_count)
+                } else {
+                    "Threat actors / APT groups (all included)".to_string()
+                };
+                egui::CollapsingHeader::new(apt_header)
+                    .id_salt("apt_header")
                     .show(ui, |ui| {
-                        for (i, g) in APT_GROUPS.iter().enumerate() {
-                            if !g.matches_search(&needle) {
-                                continue;
+                        ui.label(
+                            egui::RichText::new(
+                                "Nothing selected = all actors included. Selecting groups keeps \
+                                 only rules mentioning the group, its aliases, or its malware \
+                                 families.",
+                            )
+                            .size(12.0)
+                            .color(egui::Color32::GRAY),
+                        );
+                        ui.add_space(6.0);
+
+                        ui.horizontal(|ui| {
+                            ui.label("Search:");
+                            ui.text_edit_singleline(&mut app.apt_search);
+                            if apt_count > 0 && ui.small_button("Clear").clicked() {
+                                for v in app.apt_selected.iter_mut() {
+                                    *v = false;
+                                }
                             }
-                            let label = format!(
-                                "{} ({}) — {}",
-                                g.name, g.mitre_id, g.origin
+                        });
+                        ui.add_space(4.0);
+
+                        let needle = app.apt_search.to_lowercase();
+                        egui::ScrollArea::vertical()
+                            .id_salt("apt_scroll")
+                            .max_height(220.0)
+                            .show(ui, |ui| {
+                                for (i, g) in APT_GROUPS.iter().enumerate() {
+                                    if !g.matches_search(&needle) {
+                                        continue;
+                                    }
+                                    let label =
+                                        format!("{} ({}) — {}", g.name, g.mitre_id, g.origin);
+                                    ui.checkbox(&mut app.apt_selected[i], label)
+                                        .on_hover_text(format!(
+                                            "Aliases: {}\nSoftware: {}",
+                                            g.aliases.join(", "),
+                                            g.software.join(", ")
+                                        ));
+                                }
+                            });
+
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Extra terms (comma-separated):");
+                            ui.text_edit_singleline(&mut app.apt_custom_terms).on_hover_text(
+                                "Actor or malware names not in the list, e.g. Vidar, RedLine",
                             );
-                            ui.checkbox(&mut app.apt_selected[i], label)
-                                .on_hover_text(format!(
-                                    "Aliases: {}\nSoftware: {}",
-                                    g.aliases.join(", "),
-                                    g.software.join(", ")
-                                ));
-                        }
+                        });
                     });
 
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    ui.label("Extra terms (comma-separated):");
-                    ui.text_edit_singleline(&mut app.apt_custom_terms)
-                        .on_hover_text("Actor or malware names not in the list, e.g. Vidar, RedLine");
-                });
-
-                // ---------- ATT&CK technique targeting ----------
+                // ---------- ATT&CK technique (TTP) targeting ----------
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
-                ui.heading("MITRE ATT&CK techniques (optional):");
-                ui.label(
-                    egui::RichText::new(
-                        "Comma-separated T-codes, e.g. T1059, T1566.001. A parent code also \
-                         keeps its subtechniques (T1059 keeps T1059.001). Only rules that \
-                         reference a listed technique are kept.",
+                let ttp_count = app.ttp_selected.iter().filter(|&&v| v).count();
+                let extra_codes = !app.technique_input.trim().is_empty();
+                let ttp_header = if ttp_count > 0 || extra_codes {
+                    format!(
+                        "MITRE ATT&CK techniques ({} selected{})",
+                        ttp_count,
+                        if extra_codes { " + custom" } else { "" }
                     )
-                    .size(12.0)
-                    .color(egui::Color32::GRAY),
-                );
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    ui.label("T-codes:");
-                    ui.text_edit_singleline(&mut app.technique_input)
-                        .on_hover_text("e.g. T1059, T1021.001, T1566");
-                });
+                } else {
+                    "MITRE ATT&CK techniques (all included)".to_string()
+                };
+                egui::CollapsingHeader::new(ttp_header)
+                    .id_salt("ttp_header")
+                    .show(ui, |ui| {
+                        ui.label(
+                            egui::RichText::new(
+                                "Nothing selected = all techniques included. Selecting techniques \
+                                 keeps only rules that reference them; a parent code also keeps \
+                                 its subtechniques (T1059 keeps T1059.001).",
+                            )
+                            .size(12.0)
+                            .color(egui::Color32::GRAY),
+                        );
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Search:");
+                            ui.text_edit_singleline(&mut app.ttp_search);
+                            if ttp_count > 0 && ui.small_button("Clear").clicked() {
+                                for v in app.ttp_selected.iter_mut() {
+                                    *v = false;
+                                }
+                            }
+                        });
+                        ui.add_space(4.0);
+
+                        let ttp_needle = app.ttp_search.to_lowercase();
+                        egui::ScrollArea::vertical()
+                            .id_salt("ttp_scroll")
+                            .max_height(260.0)
+                            .show(ui, |ui| {
+                                let mut last_tactic = "";
+                                for (i, def) in TTP_CATALOG.iter().enumerate() {
+                                    if !ttp_needle.is_empty()
+                                        && !def.id.to_lowercase().contains(&ttp_needle)
+                                        && !def.name.to_lowercase().contains(&ttp_needle)
+                                        && !def.tactic.to_lowercase().contains(&ttp_needle)
+                                    {
+                                        continue;
+                                    }
+                                    if def.tactic != last_tactic {
+                                        ui.add_space(6.0);
+                                        ui.label(
+                                            egui::RichText::new(def.tactic).strong().size(13.0),
+                                        );
+                                        last_tactic = def.tactic;
+                                    }
+                                    let indent = if def.id.contains('.') { "    " } else { "" };
+                                    ui.checkbox(
+                                        &mut app.ttp_selected[i],
+                                        format!("{}{} — {}", indent, def.id, def.name),
+                                    );
+                                }
+                            });
+
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Extra T-codes (comma-separated):");
+                            ui.text_edit_singleline(&mut app.technique_input)
+                                .on_hover_text("Codes not in the list, e.g. T1621, T1651");
+                        });
+                    });
 
                 ui.add_space(10.0);
                 ui.separator();
@@ -390,12 +473,18 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         .map(|(_, d)| d.name.to_string())
                         .collect();
 
-                    let technique_ids: Vec<String> = app
-                        .technique_input
-                        .split([',', ' ', ';'])
-                        .map(|t| t.trim().to_string())
-                        .filter(|t| !t.is_empty())
+                    let mut technique_ids: Vec<String> = TTP_CATALOG
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.ttp_selected[*i])
+                        .map(|(_, d)| d.id.to_string())
                         .collect();
+                    for t in app.technique_input.split([',', ' ', ';']) {
+                        let t = t.trim();
+                        if !t.is_empty() {
+                            technique_ids.push(t.to_string());
+                        }
+                    }
 
                     let filter = Arc::new(CompiledFilter::build_full(
                         source_ids,
