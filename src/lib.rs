@@ -1,9 +1,9 @@
-pub mod main_menu;
-pub mod download;
-pub mod rules;
-pub mod ioc;
-pub mod filter;
 pub mod apt_catalog;
 pub mod azure_tables;
+pub mod download;
+pub mod filter;
+pub mod ioc;
+pub mod main_menu;
+pub mod rules;
 pub mod splunk_sourcetypes;
 pub mod ttp_catalog;

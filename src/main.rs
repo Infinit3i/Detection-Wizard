@@ -24,9 +24,8 @@ fn load_icon(path: &str) -> Option<IconData> {
 fn wgpu_available() -> bool {
     std::panic::catch_unwind(|| {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        let adapter = pollster::block_on(
-            instance.request_adapter(&wgpu::RequestAdapterOptions::default()),
-        );
+        let adapter =
+            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()));
         adapter.is_ok()
     })
     .unwrap_or(false)

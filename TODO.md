@@ -10,14 +10,14 @@ Ranked by impact-to-effort. Items 1–3 are each ~1 hour in the existing egui co
 - Why: the three OR'd targeting dimensions + AND'd APT filter are invisible;
   this removes all guessing about what a selection actually does.
 
-## 2. Preview counts / dry run
-- [ ] "Preview" button that runs `CompiledFilter` against already-downloaded repos
-  without writing output; show `keeps 412 of 5,890`.
-- [ ] Break down drops by reason: no source match / no table match / no sourcetype
-  match / APT filter / unclassifiable.
-- [ ] Post-run: write the same counts to a `filter_report.txt` in the output folder.
-- Why: strict filtering silently drops unclassifiable rules; without feedback a
-  small result set looks like a bug.
+## 2. Preview counts / dry run  ✅ (live counts + report; no separate preview pass)
+- [x] Live "kept N of M" with per-reason drops shown during the run (the pipeline
+  clones fresh each run, so counts are gathered as files pass the filter rather
+  than in a separate preview pass).
+- [x] Break down drops by reason: source / actor / technique / unreadable.
+- [x] Post-run: write `filter_report.txt` (filters applied + counts) to the output folder.
+- Note: a true pre-download "Preview" would need a persistent rule cache; revisit
+  if repos are ever cached locally between runs.
 
 ## 3. Mismatch guardrails
 - [ ] Warn when Splunk sourcetypes are selected but the Splunk tool is unchecked.

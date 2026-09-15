@@ -1,8 +1,8 @@
-use crate::download::{process_tool, ToolSpec};
+use crate::download::{ToolSpec, process_tool};
 use eframe::egui::Context;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 pub fn yara_total_sources() -> usize {
     YARA_REPOS.len() + YARA_PAGES.len()

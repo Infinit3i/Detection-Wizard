@@ -1,8 +1,8 @@
-use crate::download::{process_tool, ToolSpec};
+use crate::download::{ToolSpec, process_tool};
 use eframe::egui::Context;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 pub fn sigma_total_sources() -> usize {
     SIGMA_REPOS.len() + SIGMA_PAGES.len()

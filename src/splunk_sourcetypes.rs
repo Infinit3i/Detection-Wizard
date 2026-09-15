@@ -23,15 +23,39 @@ pub static SPLUNK_SOURCETYPES: &[SourcetypeDef] = &[
     s("WinEventLog:System", "Windows"),
     s("WinEventLog:Application", "Windows"),
     s("XmlWinEventLog:Security", "Windows"),
-    s("WinEventLog:Microsoft-Windows-Sysmon/Operational", "Windows"),
-    s("XmlWinEventLog:Microsoft-Windows-Sysmon/Operational", "Windows"),
-    s("WinEventLog:Microsoft-Windows-PowerShell/Operational", "Windows"),
-    s("XmlWinEventLog:Microsoft-Windows-PowerShell/Operational", "Windows"),
+    s(
+        "WinEventLog:Microsoft-Windows-Sysmon/Operational",
+        "Windows",
+    ),
+    s(
+        "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational",
+        "Windows",
+    ),
+    s(
+        "WinEventLog:Microsoft-Windows-PowerShell/Operational",
+        "Windows",
+    ),
+    s(
+        "XmlWinEventLog:Microsoft-Windows-PowerShell/Operational",
+        "Windows",
+    ),
     s("WinEventLog:Windows PowerShell", "Windows"),
-    s("WinEventLog:Microsoft-Windows-TaskScheduler/Operational", "Windows"),
-    s("WinEventLog:Microsoft-Windows-WMI-Activity/Operational", "Windows"),
-    s("WinEventLog:Microsoft-Windows-TerminalServices-LocalSessionManager/Operational", "Windows"),
-    s("WinEventLog:Microsoft-Windows-Windows Defender/Operational", "Windows"),
+    s(
+        "WinEventLog:Microsoft-Windows-TaskScheduler/Operational",
+        "Windows",
+    ),
+    s(
+        "WinEventLog:Microsoft-Windows-WMI-Activity/Operational",
+        "Windows",
+    ),
+    s(
+        "WinEventLog:Microsoft-Windows-TerminalServices-LocalSessionManager/Operational",
+        "Windows",
+    ),
+    s(
+        "WinEventLog:Microsoft-Windows-Windows Defender/Operational",
+        "Windows",
+    ),
     s("WinEventLog:DNS Server", "Windows"),
     s("MSAD:NT6:DNS", "Windows"),
     s("WinRegistry", "Windows"),

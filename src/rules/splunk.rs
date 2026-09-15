@@ -1,8 +1,8 @@
-use crate::download::{process_tool, ToolSpec};
+use crate::download::{ToolSpec, process_tool};
 use eframe::egui::Context;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 pub fn splunk_total_sources() -> usize {
     SPLUNK_REPOS.len() + SPLUNK_PAGES.len()

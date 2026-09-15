@@ -231,7 +231,10 @@ fn copy_filtered_files(
                     FilterOutcome::Rewrite(new_content) => rewritten = Some(new_content),
                 },
                 // Unreadable as UTF-8 → unclassifiable → strict drop
-                Err(_) => continue,
+                Err(_) => {
+                    filter.record_unreadable();
+                    continue;
+                }
             }
         }
 

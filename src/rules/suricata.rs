@@ -1,8 +1,8 @@
-use crate::download::{process_tool, ToolSpec};
+use crate::download::{ToolSpec, process_tool};
 use eframe::egui::Context;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 pub fn suricata_total_sources() -> usize {
     SURICATA_REPOS.len() + SURICATA_PAGES.len()
@@ -13,7 +13,7 @@ pub fn suricata_spec() -> ToolSpec {
         name: "Suricata",
         dest_subfolder: "suricata",
         repo_urls: &SURICATA_REPOS,
-        page_urls: &SURICATA_PAGES,    // only direct .rules/.rule if you have them
+        page_urls: &SURICATA_PAGES, // only direct .rules/.rule if you have them
         allowed_exts: &["rules", "rule"],
     }
 }

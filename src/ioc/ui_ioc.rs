@@ -1,6 +1,6 @@
+use super::ioc_menu::{IOCSelectorApp, OutputFormat};
 use crate::download::render_output_path_selector;
 use crate::download::{DownloadFormat, start_download};
-use super::ioc_menu::{IOCSelectorApp, OutputFormat};
 use eframe::egui;
 use egui::Margin;
 use git2::Repository;
@@ -153,7 +153,7 @@ pub fn render_ui_ioc(
                 ui.separator();
                 ui.add_space(10.0);
                 render_output_path_selector(ui, &mut app.custom_path, "./ioc_output");
-                
+
                 ui.add_space(20.0);
                 if ui.button("Run Selected").clicked() {
                     let git_repos = vec![

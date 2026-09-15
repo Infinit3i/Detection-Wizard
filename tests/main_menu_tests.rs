@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-use eframe::egui::{Context};
-use detection_wizard::main_menu::{MainApp, Screen};
+    use detection_wizard::main_menu::{MainApp, Screen};
+    use eframe::egui::Context;
 
     fn mock_context() -> Context {
         Context::default()

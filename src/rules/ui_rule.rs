@@ -1,6 +1,6 @@
 use super::rule_menu::ToolSelectorApp;
 use super::{qradar, sigma, splunk, suricata, sysmon, yara};
-use crate::apt_catalog::{expand_terms, APT_GROUPS};
+use crate::apt_catalog::{APT_GROUPS, expand_terms};
 use crate::azure_tables::AZURE_TABLES;
 use crate::download::render_output_path_selector;
 use crate::filter::{CompiledFilter, LOG_SOURCES};
@@ -8,8 +8,8 @@ use crate::splunk_sourcetypes::SPLUNK_SOURCETYPES;
 use crate::ttp_catalog::TTP_CATALOG;
 use eframe::egui;
 use egui::Margin;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_menu: impl FnMut()) {
     egui::CentralPanel::default()
@@ -28,10 +28,37 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         ui.label(format!("Currently processing: {}", current_name));
                     }
 
+                    // Live filter stats (kept vs dropped, by reason)
+                    if let Some(filter) = &app.last_filter {
+                        if !filter.is_noop() {
+                            ui.add_space(6.0);
+                            ui.label(
+                                egui::RichText::new(filter.stats_line())
+                                    .color(egui::Color32::from_rgb(120, 190, 120)),
+                            );
+                        }
+                    }
+
                     if current >= total {
+                        // Write filter_report.txt once, when the run finishes.
+                        if !app.report_written {
+                            if let Some(filter) = &app.last_filter {
+                                let dir = app
+                                    .custom_path
+                                    .clone()
+                                    .unwrap_or_else(|| "./rule_output".to_string());
+                                let _ = std::fs::create_dir_all(&dir);
+                                let path = std::path::Path::new(&dir).join("filter_report.txt");
+                                let _ = std::fs::write(&path, filter.report_text());
+                            }
+                            app.report_written = true;
+                        }
                         ui.vertical_centered(|ui| {
                             ui.add_space(20.0);
                             ui.heading(egui::RichText::new("✅ COMPLETE ✅").size(60.0));
+                            if app.last_filter.as_ref().map_or(false, |f| !f.is_noop()) {
+                                ui.label("filter_report.txt written to the output folder.");
+                            }
                             ui.add_space(20.0);
                             if ui
                                 .add(
@@ -606,6 +633,10 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         selected_sourcetypes,
                         technique_ids,
                     ));
+
+                    // Keep a handle for live stats + end-of-run report.
+                    app.last_filter = Some(Arc::clone(&filter));
+                    app.report_written = false;
 
                     // Find the "All" index dynamically
                     let all_index = app.tool_names.iter().position(|&x| x == "All");

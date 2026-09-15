@@ -1,8 +1,8 @@
-use crate::download::{process_tool, ToolSpec};
+use crate::download::{ToolSpec, process_tool};
 use eframe::egui::Context;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 pub fn sysmon_total_sources() -> usize {
     SYSMON_REPOS.len() + SYSMON_PAGES.len()
@@ -12,8 +12,8 @@ pub fn sysmon_spec() -> ToolSpec {
     ToolSpec {
         name: "Sysmon",
         dest_subfolder: "sysmon",
-        repo_urls: &SYSMON_REPOS,  // keep [] if you don’t have repos
-        page_urls: &SYSMON_PAGES,  // direct XMLs if you have them
+        repo_urls: &SYSMON_REPOS, // keep [] if you don’t have repos
+        page_urls: &SYSMON_PAGES, // direct XMLs if you have them
         allowed_exts: &["xml"],
     }
 }

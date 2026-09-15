@@ -26,21 +26,54 @@ pub static LOG_SOURCES: &[LogSourceDef] = &[
         label: "Windows (Security / Sysmon / PowerShell)",
         sigma_products: &["windows"],
         sigma_services: &[
-            "security", "sysmon", "system", "powershell", "application",
-            "windefend", "taskscheduler", "wmi", "dns-server", "msexchange",
+            "security",
+            "sysmon",
+            "system",
+            "powershell",
+            "application",
+            "windefend",
+            "taskscheduler",
+            "wmi",
+            "dns-server",
+            "msexchange",
         ],
         sigma_categories: &[
-            "process_creation", "registry_set", "registry_add", "registry_event",
-            "registry_delete", "image_load", "file_event", "file_delete",
-            "file_change", "file_access", "driver_load", "pipe_created",
-            "wmi_event", "ps_script", "ps_module", "ps_classic_start",
-            "create_remote_thread", "process_access", "network_connection",
-            "dns_query", "create_stream_hash", "raw_access_thread", "sysmon_error",
-            "sysmon_status", "process_tampering",
+            "process_creation",
+            "registry_set",
+            "registry_add",
+            "registry_event",
+            "registry_delete",
+            "image_load",
+            "file_event",
+            "file_delete",
+            "file_change",
+            "file_access",
+            "driver_load",
+            "pipe_created",
+            "wmi_event",
+            "ps_script",
+            "ps_module",
+            "ps_classic_start",
+            "create_remote_thread",
+            "process_access",
+            "network_connection",
+            "dns_query",
+            "create_stream_hash",
+            "raw_access_thread",
+            "sysmon_error",
+            "sysmon_status",
+            "process_tampering",
         ],
         keywords: &[
-            "wineventlog", "sysmon", "windows", "eventcode", "powershell",
-            "event_id", "eventid", "security.evtx", "winlog",
+            "wineventlog",
+            "sysmon",
+            "windows",
+            "eventcode",
+            "powershell",
+            "event_id",
+            "eventid",
+            "security.evtx",
+            "winlog",
         ],
     },
     LogSourceDef {
@@ -49,7 +82,15 @@ pub static LOG_SOURCES: &[LogSourceDef] = &[
         sigma_products: &["linux"],
         sigma_services: &["auditd", "sshd", "auth", "sudo", "cron", "syslog", "clamav"],
         sigma_categories: &[],
-        keywords: &["auditd", "linux", "syslog", "audit.log", "auth.log", "sshd", "bash_history"],
+        keywords: &[
+            "auditd",
+            "linux",
+            "syslog",
+            "audit.log",
+            "auth.log",
+            "sshd",
+            "bash_history",
+        ],
     },
     LogSourceDef {
         id: "macos",
@@ -62,12 +103,24 @@ pub static LOG_SOURCES: &[LogSourceDef] = &[
     LogSourceDef {
         id: "network",
         label: "Network (Zeek / NetFlow / Firewall / DNS / IDS)",
-        sigma_products: &["zeek", "netflow", "cisco", "juniper", "huawei", "paloalto", "fortios"],
+        sigma_products: &[
+            "zeek", "netflow", "cisco", "juniper", "huawei", "paloalto", "fortios",
+        ],
         sigma_services: &["dns", "firewall", "netflow"],
         sigma_categories: &["dns", "firewall", "flow"],
         keywords: &[
-            "zeek", "bro_", "netflow", "firewall", "suricata", "snort",
-            "pan:traffic", "cisco", "conn.log", "dns.log", "pfsense", "opnsense",
+            "zeek",
+            "bro_",
+            "netflow",
+            "firewall",
+            "suricata",
+            "snort",
+            "pan:traffic",
+            "cisco",
+            "conn.log",
+            "dns.log",
+            "pfsense",
+            "opnsense",
         ],
     },
     LogSourceDef {
@@ -76,7 +129,16 @@ pub static LOG_SOURCES: &[LogSourceDef] = &[
         sigma_products: &["apache", "nginx"],
         sigma_services: &["iis", "apache", "nginx"],
         sigma_categories: &["proxy", "webserver"],
-        keywords: &["proxy", "access_combined", "iis", "apache", "nginx", "useragent", "user-agent", "http_method"],
+        keywords: &[
+            "proxy",
+            "access_combined",
+            "iis",
+            "apache",
+            "nginx",
+            "useragent",
+            "user-agent",
+            "http_method",
+        ],
     },
     LogSourceDef {
         id: "cloud_aws",
@@ -90,9 +152,23 @@ pub static LOG_SOURCES: &[LogSourceDef] = &[
         id: "cloud_azure",
         label: "Cloud: Azure / M365 / Entra",
         sigma_products: &["azure", "m365", "microsoft365"],
-        sigma_services: &["azuread", "azureactivity", "exchange", "threat_management", "audit"],
+        sigma_services: &[
+            "azuread",
+            "azureactivity",
+            "exchange",
+            "threat_management",
+            "audit",
+        ],
         sigma_categories: &[],
-        keywords: &["azure", "entra", "office 365", "o365", "m365", "exchangeonline", "azuread"],
+        keywords: &[
+            "azure",
+            "entra",
+            "office 365",
+            "o365",
+            "m365",
+            "exchangeonline",
+            "azuread",
+        ],
     },
     LogSourceDef {
         id: "cloud_gcp",
@@ -100,7 +176,13 @@ pub static LOG_SOURCES: &[LogSourceDef] = &[
         sigma_products: &["gcp", "google_workspace"],
         sigma_services: &["gcp.audit", "google_workspace.admin"],
         sigma_categories: &[],
-        keywords: &["gcp", "google cloud", "gsuite", "google_workspace", "stackdriver"],
+        keywords: &[
+            "gcp",
+            "google cloud",
+            "gsuite",
+            "google_workspace",
+            "stackdriver",
+        ],
     },
     LogSourceDef {
         id: "idp",
@@ -116,7 +198,15 @@ pub static LOG_SOURCES: &[LogSourceDef] = &[
         sigma_products: &[],
         sigma_services: &["windefend", "sophos"],
         sigma_categories: &["antivirus", "edr"],
-        keywords: &["defender", "crowdstrike", "sentinelone", "carbon black", "antivirus", "falcon", "edr"],
+        keywords: &[
+            "defender",
+            "crowdstrike",
+            "sentinelone",
+            "carbon black",
+            "antivirus",
+            "falcon",
+            "edr",
+        ],
     },
 ];
 
@@ -128,6 +218,63 @@ pub enum FilterOutcome {
     Drop,
     /// write this filtered content instead (e.g. per-line Suricata filtering)
     Rewrite(String),
+}
+
+/// Why a rule was dropped — for the preview / filter report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DropReason {
+    /// did not match any selected log source / Azure table / Splunk sourcetype
+    Source,
+    /// did not mention any selected threat actor / malware
+    Apt,
+    /// did not reference any selected ATT&CK technique
+    Technique,
+}
+
+/// Traced outcome: like FilterOutcome but carries the drop reason.
+pub enum TraceOutcome {
+    Keep,
+    Rewrite(String),
+    Drop(DropReason),
+}
+
+/// Running tally of what the filter did, aggregated across all tools/files.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FilterStats {
+    pub scanned: usize,
+    pub kept: usize,
+    pub rewritten: usize,
+    pub dropped_source: usize,
+    pub dropped_apt: usize,
+    pub dropped_technique: usize,
+    /// files that were not valid UTF-8 → unclassifiable → strict drop
+    pub dropped_unreadable: usize,
+}
+
+impl FilterStats {
+    pub fn record(&mut self, outcome: &TraceOutcome) {
+        self.scanned += 1;
+        match outcome {
+            TraceOutcome::Keep => self.kept += 1,
+            TraceOutcome::Rewrite(_) => self.rewritten += 1,
+            TraceOutcome::Drop(DropReason::Source) => self.dropped_source += 1,
+            TraceOutcome::Drop(DropReason::Apt) => self.dropped_apt += 1,
+            TraceOutcome::Drop(DropReason::Technique) => self.dropped_technique += 1,
+        }
+    }
+
+    pub fn record_unreadable(&mut self) {
+        self.scanned += 1;
+        self.dropped_unreadable += 1;
+    }
+
+    pub fn total_dropped(&self) -> usize {
+        self.dropped_source + self.dropped_apt + self.dropped_technique + self.dropped_unreadable
+    }
+
+    pub fn total_kept(&self) -> usize {
+        self.kept + self.rewritten
+    }
 }
 
 /// Compiled, thread-safe filter built once per run.
@@ -152,16 +299,77 @@ pub struct CompiledFilter {
     pub technique_ids: Vec<String>,
     /// matcher over technique_ids; parent codes also match their subtechniques
     technique_regex: Option<RegexSet>,
+    /// live tally of what the filter did this run (interior-mutable, thread-safe)
+    stats: FilterStatsAtomic,
+}
+
+/// Thread-safe interior-mutable counters, shared via the Arc<CompiledFilter>.
+#[derive(Default)]
+struct FilterStatsAtomic {
+    scanned: std::sync::atomic::AtomicUsize,
+    kept: std::sync::atomic::AtomicUsize,
+    rewritten: std::sync::atomic::AtomicUsize,
+    dropped_source: std::sync::atomic::AtomicUsize,
+    dropped_apt: std::sync::atomic::AtomicUsize,
+    dropped_technique: std::sync::atomic::AtomicUsize,
+    dropped_unreadable: std::sync::atomic::AtomicUsize,
+}
+
+impl FilterStatsAtomic {
+    fn record(&self, outcome: &TraceOutcome) {
+        use std::sync::atomic::Ordering::Relaxed;
+        self.scanned.fetch_add(1, Relaxed);
+        match outcome {
+            TraceOutcome::Keep => self.kept.fetch_add(1, Relaxed),
+            TraceOutcome::Rewrite(_) => self.rewritten.fetch_add(1, Relaxed),
+            TraceOutcome::Drop(DropReason::Source) => self.dropped_source.fetch_add(1, Relaxed),
+            TraceOutcome::Drop(DropReason::Apt) => self.dropped_apt.fetch_add(1, Relaxed),
+            TraceOutcome::Drop(DropReason::Technique) => {
+                self.dropped_technique.fetch_add(1, Relaxed)
+            }
+        };
+    }
 }
 
 /// Generic software/tool names that appear in MITRE "uses" relationships but
 /// would match nearly every rule as keywords. Never used as filter terms.
 const TERM_BLACKLIST: &[&str] = &[
-    "at", "net", "cmd", "ping", "reg", "netsh", "tasklist", "systeminfo",
-    "ipconfig", "whoami", "route", "arp", "ftp", "curl", "certutil", "esentutl",
-    "schtasks", "sc", "query", "dsquery", "pwsh", "powershell", "cscript",
-    "wscript", "mshta", "rundll32", "regsvr32", "msiexec", "installutil",
-    "windows", "linux", "macos", "python", "java", "bash", "ssh",
+    "at",
+    "net",
+    "cmd",
+    "ping",
+    "reg",
+    "netsh",
+    "tasklist",
+    "systeminfo",
+    "ipconfig",
+    "whoami",
+    "route",
+    "arp",
+    "ftp",
+    "curl",
+    "certutil",
+    "esentutl",
+    "schtasks",
+    "sc",
+    "query",
+    "dsquery",
+    "pwsh",
+    "powershell",
+    "cscript",
+    "wscript",
+    "mshta",
+    "rundll32",
+    "regsvr32",
+    "msiexec",
+    "installutil",
+    "windows",
+    "linux",
+    "macos",
+    "python",
+    "java",
+    "bash",
+    "ssh",
 ];
 
 impl CompiledFilter {
@@ -178,6 +386,7 @@ impl CompiledFilter {
             sourcetype_regex: None,
             technique_ids: Vec::new(),
             technique_regex: None,
+            stats: FilterStatsAtomic::default(),
         }
     }
 
@@ -228,7 +437,12 @@ impl CompiledFilter {
         } else {
             let patterns: Vec<String> = azure_tables
                 .iter()
-                .map(|t| format!(r"(?i)(^|[^A-Za-z0-9_]){}([^A-Za-z0-9_]|$)", regex::escape(t)))
+                .map(|t| {
+                    format!(
+                        r"(?i)(^|[^A-Za-z0-9_]){}([^A-Za-z0-9_]|$)",
+                        regex::escape(t)
+                    )
+                })
                 .collect();
             RegexSet::new(&patterns).ok()
         };
@@ -242,12 +456,7 @@ impl CompiledFilter {
         } else {
             let patterns: Vec<String> = splunk_sourcetypes
                 .iter()
-                .map(|t| {
-                    format!(
-                        r#"(?i)(^|["'=\s(]){}($|["'\s)|,])"#,
-                        regex::escape(t)
-                    )
-                })
+                .map(|t| format!(r#"(?i)(^|["'=\s(]){}($|["'\s)|,])"#, regex::escape(t)))
                 .collect();
             RegexSet::new(&patterns).ok()
         };
@@ -272,7 +481,10 @@ impl CompiledFilter {
                         format!(r"(?i)(^|[^A-Za-z0-9]){}($|[^0-9])", regex::escape(t))
                     } else {
                         // parent: match itself and any .NNN subtechnique
-                        format!(r"(?i)(^|[^A-Za-z0-9]){}(\.\d{{3}})?($|[^0-9.])", regex::escape(t))
+                        format!(
+                            r"(?i)(^|[^A-Za-z0-9]){}(\.\d{{3}})?($|[^0-9.])",
+                            regex::escape(t)
+                        )
                     }
                 })
                 .collect();
@@ -290,6 +502,7 @@ impl CompiledFilter {
             sourcetype_regex,
             technique_ids,
             technique_regex,
+            stats: FilterStatsAtomic::default(),
         }
     }
 
@@ -352,8 +565,117 @@ impl CompiledFilter {
     /// Decide what to do with one candidate rule file.
     /// `tool` is the ToolSpec name: "Yara", "Sigma", "Suricata", "Splunk", "QRadar", "Sysmon".
     pub fn filter_file(&self, tool: &str, content: &str) -> FilterOutcome {
+        let traced = self.filter_file_traced(tool, content);
+        self.stats.record(&traced);
+        match traced {
+            TraceOutcome::Keep => FilterOutcome::Keep,
+            TraceOutcome::Rewrite(s) => FilterOutcome::Rewrite(s),
+            TraceOutcome::Drop(_) => FilterOutcome::Drop,
+        }
+    }
+
+    /// Record a file that could not be read as UTF-8 (strict drop).
+    pub fn record_unreadable(&self) {
+        use std::sync::atomic::Ordering::Relaxed;
+        self.stats.scanned.fetch_add(1, Relaxed);
+        self.stats.dropped_unreadable.fetch_add(1, Relaxed);
+    }
+
+    /// Snapshot the running tally.
+    pub fn stats(&self) -> FilterStats {
+        use std::sync::atomic::Ordering::Relaxed;
+        FilterStats {
+            scanned: self.stats.scanned.load(Relaxed),
+            kept: self.stats.kept.load(Relaxed),
+            rewritten: self.stats.rewritten.load(Relaxed),
+            dropped_source: self.stats.dropped_source.load(Relaxed),
+            dropped_apt: self.stats.dropped_apt.load(Relaxed),
+            dropped_technique: self.stats.dropped_technique.load(Relaxed),
+            dropped_unreadable: self.stats.dropped_unreadable.load(Relaxed),
+        }
+    }
+
+    /// One-line human summary of the current tally, for the UI.
+    pub fn stats_line(&self) -> String {
+        let s = self.stats();
+        if s.scanned == 0 {
+            return "No rules scanned yet.".to_string();
+        }
+        format!(
+            "Kept {} of {} rules — dropped {} (source {}, actor {}, technique {}, unreadable {}).",
+            s.total_kept(),
+            s.scanned,
+            s.total_dropped(),
+            s.dropped_source,
+            s.dropped_apt,
+            s.dropped_technique,
+            s.dropped_unreadable,
+        )
+    }
+
+    /// Full multi-line report body for `filter_report.txt`.
+    pub fn report_text(&self) -> String {
+        let s = self.stats();
+        let mut out = String::new();
+        out.push_str("Detection-Wizard filter report\n");
+        out.push_str("==============================\n\n");
+
+        out.push_str("Active filters:\n");
         if self.is_noop() {
-            return FilterOutcome::Keep;
+            out.push_str("  (none — every downloaded rule was kept)\n");
+        } else {
+            if self.source_filter_active() {
+                out.push_str(&format!("  Log sources : {}\n", self.source_ids.join(", ")));
+            }
+            if self.table_filter_active() {
+                out.push_str(&format!(
+                    "  Azure tables: {}\n",
+                    self.azure_tables.join(", ")
+                ));
+            }
+            if self.sourcetype_filter_active() {
+                out.push_str(&format!(
+                    "  Sourcetypes : {}\n",
+                    self.splunk_sourcetypes.join(", ")
+                ));
+            }
+            if self.apt_filter_active() {
+                out.push_str(&format!("  Threat actors: {}\n", self.apt_terms.join(", ")));
+            }
+            if self.technique_filter_active() {
+                out.push_str(&format!(
+                    "  Techniques  : {}\n",
+                    self.technique_ids.join(", ")
+                ));
+            }
+        }
+
+        out.push_str("\nResults:\n");
+        out.push_str(&format!("  Rules scanned      : {}\n", s.scanned));
+        out.push_str(&format!(
+            "  Kept               : {} ({} rewritten in place)\n",
+            s.total_kept(),
+            s.rewritten
+        ));
+        out.push_str(&format!("  Dropped (total)    : {}\n", s.total_dropped()));
+        out.push_str(&format!("    no source match  : {}\n", s.dropped_source));
+        out.push_str(&format!("    no actor match   : {}\n", s.dropped_apt));
+        out.push_str(&format!("    no technique     : {}\n", s.dropped_technique));
+        out.push_str(&format!(
+            "    unreadable/binary: {}\n",
+            s.dropped_unreadable
+        ));
+        out.push_str(
+            "\nStrict mode: any rule that could not be positively classified against an \
+             active filter was dropped.\n",
+        );
+        out
+    }
+
+    /// Same decision as `filter_file`, but drops carry a reason for reporting.
+    pub fn filter_file_traced(&self, tool: &str, content: &str) -> TraceOutcome {
+        if self.is_noop() {
+            return TraceOutcome::Keep;
         }
 
         match tool {
@@ -361,10 +683,12 @@ impl CompiledFilter {
             "Yara" => {
                 // YARA scans files/memory, not log tables: only the APT and
                 // technique filters apply.
-                if self.matches_apt(content) && self.matches_technique(content) {
-                    FilterOutcome::Keep
+                if !self.matches_apt(content) {
+                    TraceOutcome::Drop(DropReason::Apt)
+                } else if !self.matches_technique(content) {
+                    TraceOutcome::Drop(DropReason::Technique)
                 } else {
-                    FilterOutcome::Drop
+                    TraceOutcome::Keep
                 }
             }
             "Suricata" => self.filter_suricata(content),
@@ -373,16 +697,16 @@ impl CompiledFilter {
                 // Sysmon configs are Windows collection configs, not APT detections:
                 // only the source filter applies (APT filter would drop all of them).
                 if self.source_filter_active() && !self.source_selected("windows") {
-                    FilterOutcome::Drop
+                    TraceOutcome::Drop(DropReason::Source)
                 } else {
-                    FilterOutcome::Keep
+                    TraceOutcome::Keep
                 }
             }
-            _ => FilterOutcome::Keep,
+            _ => TraceOutcome::Keep,
         }
     }
 
-    fn filter_sigma(&self, content: &str) -> FilterOutcome {
+    fn filter_sigma(&self, content: &str) -> TraceOutcome {
         // Source/table dimension: pass if the rule matches a selected coarse
         // source OR maps to a selected Azure/M365 table (when those filters
         // are active). Strict: no positive match on any active dimension → drop.
@@ -416,7 +740,10 @@ impl CompiledFilter {
                 // azure/m365 sigma rules: logsource.service must map to a
                 // selected table; any rule mentioning a selected table name
                 // in its content also qualifies.
-                let is_azure = matches!(product.as_deref(), Some("azure") | Some("m365") | Some("microsoft365"));
+                let is_azure = matches!(
+                    product.as_deref(),
+                    Some("azure") | Some("m365") | Some("microsoft365")
+                );
                 if is_azure {
                     if let Some(svc) = service.as_deref() {
                         table_ok = self.table_sigma_services.iter().any(|s| s == svc);
@@ -431,26 +758,26 @@ impl CompiledFilter {
             }
 
             if !source_ok && !table_ok {
-                return FilterOutcome::Drop;
+                return TraceOutcome::Drop(DropReason::Source);
             }
         }
 
         if !self.matches_apt(content) {
-            return FilterOutcome::Drop;
+            return TraceOutcome::Drop(DropReason::Apt);
         }
         if !self.matches_technique(content) {
-            return FilterOutcome::Drop;
+            return TraceOutcome::Drop(DropReason::Technique);
         }
-        FilterOutcome::Keep
+        TraceOutcome::Keep
     }
 
-    fn filter_suricata(&self, content: &str) -> FilterOutcome {
+    fn filter_suricata(&self, content: &str) -> TraceOutcome {
         // Suricata is inherently network telemetry.
         if self.source_filter_active() && !self.source_selected("network") {
-            return FilterOutcome::Drop;
+            return TraceOutcome::Drop(DropReason::Source);
         }
         if !self.apt_filter_active() && !self.technique_filter_active() {
-            return FilterOutcome::Keep;
+            return TraceOutcome::Keep;
         }
         // One rule per line: keep only matching rules (plus comments they sit under).
         let kept: Vec<&str> = content
@@ -464,14 +791,21 @@ impl CompiledFilter {
             })
             .collect();
         if kept.is_empty() {
-            FilterOutcome::Drop
+            let reason = if self.apt_filter_active() {
+                DropReason::Apt
+            } else {
+                DropReason::Technique
+            };
+            TraceOutcome::Drop(reason)
         } else {
-            FilterOutcome::Rewrite(kept.join("\n") + "\n")
+            TraceOutcome::Rewrite(kept.join("\n") + "\n")
         }
     }
 
-    fn filter_text_rules(&self, content: &str) -> FilterOutcome {
-        if self.source_filter_active() || self.table_filter_active() || self.sourcetype_filter_active()
+    fn filter_text_rules(&self, content: &str) -> TraceOutcome {
+        if self.source_filter_active()
+            || self.table_filter_active()
+            || self.sourcetype_filter_active()
         {
             let mut source_ok = false;
             if self.source_filter_active() {
@@ -498,16 +832,16 @@ impl CompiledFilter {
 
             // Strict: no positive match on any active dimension → drop.
             if !source_ok && !table_ok && !sourcetype_ok {
-                return FilterOutcome::Drop;
+                return TraceOutcome::Drop(DropReason::Source);
             }
         }
         if !self.matches_apt(content) {
-            return FilterOutcome::Drop;
+            return TraceOutcome::Drop(DropReason::Apt);
         }
         if !self.matches_technique(content) {
-            return FilterOutcome::Drop;
+            return TraceOutcome::Drop(DropReason::Technique);
         }
-        FilterOutcome::Keep
+        TraceOutcome::Keep
     }
 }
 
@@ -561,17 +895,32 @@ mod tests {
     #[test]
     fn noop_filter_keeps_everything() {
         let f = CompiledFilter::none();
-        assert!(matches!(f.filter_file("Sigma", SIGMA_WIN), FilterOutcome::Keep));
-        assert!(matches!(f.filter_file("Yara", "rule x {}"), FilterOutcome::Keep));
+        assert!(matches!(
+            f.filter_file("Sigma", SIGMA_WIN),
+            FilterOutcome::Keep
+        ));
+        assert!(matches!(
+            f.filter_file("Yara", "rule x {}"),
+            FilterOutcome::Keep
+        ));
     }
 
     #[test]
     fn sigma_source_filter_strict() {
         let f = CompiledFilter::build(vec!["windows".into()], vec![]);
-        assert!(matches!(f.filter_file("Sigma", SIGMA_WIN), FilterOutcome::Keep));
-        assert!(matches!(f.filter_file("Sigma", SIGMA_AWS), FilterOutcome::Drop));
+        assert!(matches!(
+            f.filter_file("Sigma", SIGMA_WIN),
+            FilterOutcome::Keep
+        ));
+        assert!(matches!(
+            f.filter_file("Sigma", SIGMA_AWS),
+            FilterOutcome::Drop
+        ));
         // no logsource at all → unclassifiable → drop
-        assert!(matches!(f.filter_file("Sigma", "title: x\ndetection: y\n"), FilterOutcome::Drop));
+        assert!(matches!(
+            f.filter_file("Sigma", "title: x\ndetection: y\n"),
+            FilterOutcome::Drop
+        ));
     }
 
     #[test]
@@ -603,13 +952,19 @@ mod tests {
     #[test]
     fn suricata_dropped_when_network_not_selected() {
         let f = CompiledFilter::build(vec!["windows".into()], vec![]);
-        assert!(matches!(f.filter_file("Suricata", "alert tcp ..."), FilterOutcome::Drop));
+        assert!(matches!(
+            f.filter_file("Suricata", "alert tcp ..."),
+            FilterOutcome::Drop
+        ));
     }
 
     #[test]
     fn sysmon_exempt_from_apt_filter() {
         let f = CompiledFilter::build(vec![], vec!["Turla".into()]);
-        assert!(matches!(f.filter_file("Sysmon", "<Sysmon/>"), FilterOutcome::Keep));
+        assert!(matches!(
+            f.filter_file("Sysmon", "<Sysmon/>"),
+            FilterOutcome::Keep
+        ));
     }
 
     #[test]
@@ -646,7 +1001,10 @@ mod tests {
         ));
         // references an unselected table only
         assert!(matches!(
-            f.filter_file("Splunk", "DeviceProcessEvents | where FileName == \"mimikatz.exe\""),
+            f.filter_file(
+                "Splunk",
+                "DeviceProcessEvents | where FileName == \"mimikatz.exe\""
+            ),
             FilterOutcome::Drop
         ));
         // no table reference at all → strict drop
@@ -665,7 +1023,10 @@ mod tests {
             FilterOutcome::Keep
         ));
         let sigma_kv = "title: t\nlogsource:\n    product: azure\n    service: keyvault\ndetection:\n    sel: x\n";
-        assert!(matches!(f.filter_file("Sigma", sigma_kv), FilterOutcome::Drop));
+        assert!(matches!(
+            f.filter_file("Sigma", sigma_kv),
+            FilterOutcome::Drop
+        ));
     }
 
     #[test]
@@ -686,7 +1047,10 @@ mod tests {
             FilterOutcome::Keep
         ));
         assert!(matches!(
-            f.filter_file("Splunk", "sourcetype=\"WinEventLog:Security\" EventCode=4625"),
+            f.filter_file(
+                "Splunk",
+                "sourcetype=\"WinEventLog:Security\" EventCode=4625"
+            ),
             FilterOutcome::Keep
         ));
         // unselected sourcetype only → drop
@@ -726,13 +1090,8 @@ mod tests {
             FilterOutcome::Keep
         ));
         // sibling subtechnique of an exact selection must not match
-        let f2 = CompiledFilter::build_full(
-            vec![],
-            vec![],
-            vec![],
-            vec![],
-            vec!["T1566.001".into()],
-        );
+        let f2 =
+            CompiledFilter::build_full(vec![], vec![], vec![], vec![], vec!["T1566.001".into()]);
         assert!(matches!(
             f2.filter_file("Splunk", "mitre: T1566.002"),
             FilterOutcome::Drop
@@ -762,12 +1121,37 @@ mod tests {
             vec![],
             vec!["SigninLogs".into()],
         );
-        assert!(matches!(f.filter_file("Sigma", SIGMA_WIN), FilterOutcome::Keep));
+        assert!(matches!(
+            f.filter_file("Sigma", SIGMA_WIN),
+            FilterOutcome::Keep
+        ));
         let sigma_signin = "title: t\nlogsource:\n    product: azure\n    service: signinlogs\ndetection:\n    sel: x\n";
         assert!(matches!(
             f.filter_file("Sigma", sigma_signin),
             FilterOutcome::Keep
         ));
-        assert!(matches!(f.filter_file("Sigma", SIGMA_AWS), FilterOutcome::Drop));
+        assert!(matches!(
+            f.filter_file("Sigma", SIGMA_AWS),
+            FilterOutcome::Drop
+        ));
+    }
+
+    #[test]
+    fn stats_and_report_track_outcomes() {
+        let f = CompiledFilter::build(vec!["windows".into()], vec![]);
+        // one keep, one source-drop
+        let _ = f.filter_file("Sigma", SIGMA_WIN);
+        let _ = f.filter_file("Sigma", SIGMA_AWS);
+        f.record_unreadable();
+        let s = f.stats();
+        assert_eq!(s.scanned, 3);
+        assert_eq!(s.kept, 1);
+        assert_eq!(s.dropped_source, 1);
+        assert_eq!(s.dropped_unreadable, 1);
+        assert_eq!(s.total_kept(), 1);
+        assert_eq!(s.total_dropped(), 2);
+        let report = f.report_text();
+        assert!(report.contains("Rules scanned      : 3"));
+        assert!(report.contains("Log sources : windows"));
     }
 }

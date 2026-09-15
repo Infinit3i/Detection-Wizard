@@ -3,7 +3,7 @@ use crate::azure_tables::AZURE_TABLES;
 use crate::filter::LOG_SOURCES;
 use crate::splunk_sourcetypes::SPLUNK_SOURCETYPES;
 use crate::ttp_catalog::TTP_CATALOG;
-use eframe::{egui, App, Frame};
+use eframe::{App, Frame, egui};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
@@ -51,6 +51,11 @@ pub struct ToolSelectorApp {
     pub ttp_search: String,
     /// extra comma/space-separated T-codes not in the catalog
     pub technique_input: String,
+
+    /// filter from the most recent run, kept so we can show live stats + write a report
+    pub last_filter: Option<Arc<crate::filter::CompiledFilter>>,
+    /// true once filter_report.txt has been written for the current run
+    pub report_written: bool,
 }
 
 impl Default for ToolSelectorApp {
@@ -75,6 +80,8 @@ impl Default for ToolSelectorApp {
             ttp_selected: vec![false; TTP_CATALOG.len()],
             ttp_search: String::new(),
             technique_input: String::new(),
+            last_filter: None,
+            report_written: false,
         }
     }
 }

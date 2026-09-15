@@ -1,8 +1,8 @@
-use crate::download::{process_tool, ToolSpec};
+use crate::download::{ToolSpec, process_tool};
 use eframe::egui::Context;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 pub fn qradar_total_sources() -> usize {
     QRADAR_REPOS.len() + QRADAR_PAGES.len()
@@ -35,8 +35,6 @@ pub fn process_qradar(
     );
 }
 
-static QRADAR_REPOS: [&str; 1] = [
-    "https://github.com/Xboarder56/QRCE-Rules.git",
-];
+static QRADAR_REPOS: [&str; 1] = ["https://github.com/Xboarder56/QRCE-Rules.git"];
 
 static QRADAR_PAGES: [&str; 0] = [];
