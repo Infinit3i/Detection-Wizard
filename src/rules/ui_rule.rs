@@ -433,6 +433,119 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 ui.add_space(20.0);
                 let any_selected = app.selected.iter().any(|&v| v);
 
+                // ---------- Plain-English filter summary ----------
+                {
+                    // Collect selected labels per dimension (empty = "all")
+                    let sources: Vec<&str> = LOG_SOURCES
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.source_selected[*i])
+                        .map(|(_, d)| d.label)
+                        .collect();
+                    let tables: Vec<&str> = AZURE_TABLES
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.azure_table_selected[*i])
+                        .map(|(_, d)| d.name)
+                        .collect();
+                    let sourcetypes: Vec<&str> = SPLUNK_SOURCETYPES
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.sourcetype_selected[*i])
+                        .map(|(_, d)| d.name)
+                        .collect();
+                    let actors: Vec<&str> = APT_GROUPS
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.apt_selected[*i])
+                        .map(|(_, g)| g.name)
+                        .collect();
+                    let apt_extra: Vec<&str> = app
+                        .apt_custom_terms
+                        .split(',')
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    let ttps: Vec<&str> = TTP_CATALOG
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| app.ttp_selected[*i])
+                        .map(|(_, d)| d.id)
+                        .collect();
+                    let ttp_extra: Vec<&str> = app
+                        .technique_input
+                        .split([',', ' ', ';'])
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+
+                    // Short "a, b, c or N more" join for readability
+                    fn brief(items: &[&str], extra: &[&str]) -> String {
+                        let mut all: Vec<String> =
+                            items.iter().map(|s| s.to_string()).collect();
+                        all.extend(extra.iter().map(|s| s.to_string()));
+                        let n = all.len();
+                        if n <= 3 {
+                            all.join(", ")
+                        } else {
+                            format!("{}, +{} more", all[..3].join(", "), n - 3)
+                        }
+                    }
+
+                    // "Location" dimension = sources OR tables OR sourcetypes (any active).
+                    let loc_active =
+                        !sources.is_empty() || !tables.is_empty() || !sourcetypes.is_empty();
+                    let mut loc_parts: Vec<String> = Vec::new();
+                    if !sources.is_empty() {
+                        loc_parts.push(brief(&sources, &[]));
+                    }
+                    if !tables.is_empty() {
+                        loc_parts.push(brief(&tables, &[]));
+                    }
+                    if !sourcetypes.is_empty() {
+                        loc_parts.push(brief(&sourcetypes, &[]));
+                    }
+
+                    let apt_active = !actors.is_empty() || !apt_extra.is_empty();
+                    let ttp_active = !ttps.is_empty() || !ttp_extra.is_empty();
+
+                    // Build the AND-joined clauses.
+                    let mut clauses: Vec<String> = Vec::new();
+                    if loc_active {
+                        clauses.push(format!("come from ({})", loc_parts.join(" or ")));
+                    }
+                    if apt_active {
+                        clauses.push(format!("mention ({})", brief(&actors, &apt_extra)));
+                    }
+                    if ttp_active {
+                        clauses.push(format!("reference technique ({})", brief(&ttps, &ttp_extra)));
+                    }
+
+                    let summary = if clauses.is_empty() {
+                        "No filters active — every rule from the selected tools is downloaded."
+                            .to_string()
+                    } else {
+                        format!("Keep only rules that {} (strict: anything that can't be positively classified is dropped).", clauses.join(" AND "))
+                    };
+
+                    let color = if clauses.is_empty() {
+                        egui::Color32::from_rgb(180, 180, 100)
+                    } else {
+                        egui::Color32::from_rgb(120, 190, 120)
+                    };
+                    egui::Frame::new()
+                        .fill(egui::Color32::from_rgb(30, 34, 40))
+                        .inner_margin(Margin::same(8))
+                        .corner_radius(4)
+                        .show(ui, |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(egui::RichText::new("Filter: ").strong().color(color));
+                                ui.label(egui::RichText::new(summary).color(color));
+                            });
+                        });
+                    ui.add_space(10.0);
+                }
+
                 if ui
                     .add_enabled(any_selected, egui::Button::new("Run Selected"))
                     .clicked()
