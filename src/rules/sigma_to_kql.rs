@@ -879,6 +879,295 @@ fn parse_kql_literal(s: &str) -> Result<String, String> {
     Ok(rest.replace("\"\"", "\""))
 }
 
+// ---------------------------------------------------------------------
+// Splunk SPL (Search Processing Language)
+// ---------------------------------------------------------------------
+
+/// Render a value as an SPL double-quoted string literal (escaping `"`).
+fn spl_literal(value: &str) -> String {
+    format!("\"{}\"", value.replace('"', "\\\""))
+}
+
+/// Render one `FieldMatch` as an SPL boolean predicate suitable for a
+/// `| where` clause: `field="value"` for Equals, `like(field, "%value%")`
+/// for Contains/StartsWith/EndsWith (wildcard on the appropriate side), and
+/// `match(field, "pattern")` for Regex. Multi-value fields OR their atoms
+/// together in parens.
+fn field_match_spl(fm: &FieldMatch) -> String {
+    let field = &fm.field;
+    let atoms: Vec<String> = fm
+        .values
+        .iter()
+        .map(|v| match fm.modifier {
+            Modifier::Equals => format!("{field}={}", spl_literal(v)),
+            Modifier::Contains => format!("like({field}, {})", spl_literal(&format!("%{v}%"))),
+            Modifier::StartsWith => format!("like({field}, {})", spl_literal(&format!("{v}%"))),
+            Modifier::EndsWith => format!("like({field}, {})", spl_literal(&format!("%{v}"))),
+            Modifier::Regex => format!("match({field}, {})", spl_literal(v)),
+        })
+        .collect();
+    if atoms.len() == 1 {
+        atoms.into_iter().next().unwrap()
+    } else {
+        format!("({})", atoms.join(" or "))
+    }
+}
+
+/// Render one `SelectionBlock` (all its fields AND'd together) as SPL.
+fn block_spl(block: &SelectionBlock) -> String {
+    let atoms: Vec<String> = block.fields.iter().map(field_match_spl).collect();
+    if atoms.len() == 1 {
+        atoms.into_iter().next().unwrap()
+    } else {
+        format!("({})", atoms.join(" and "))
+    }
+}
+
+/// Render a `ConditionExpr` as an SPL `| where` boolean expression. Assumes
+/// `validate_condition_refs` already confirmed every reference resolves.
+fn condition_spl(condition: &ConditionExpr, blocks: &[SelectionBlock]) -> String {
+    match condition {
+        ConditionExpr::Block(name) => {
+            let block = blocks
+                .iter()
+                .find(|b| &b.name == name)
+                .expect("validate_condition_refs guarantees this block exists");
+            block_spl(block)
+        }
+        ConditionExpr::Not(inner) => format!("not ({})", condition_spl(inner, blocks)),
+        ConditionExpr::And(list) => list
+            .iter()
+            .map(|e| format!("({})", condition_spl(e, blocks)))
+            .collect::<Vec<_>>()
+            .join(" and "),
+        ConditionExpr::Or(list) => list
+            .iter()
+            .map(|e| format!("({})", condition_spl(e, blocks)))
+            .collect::<Vec<_>>()
+            .join(" or "),
+        ConditionExpr::OneOf(pattern) => {
+            let matched = resolve_pattern_blocks(pattern, blocks);
+            let atoms: Vec<String> = matched.iter().map(|b| block_spl(b)).collect();
+            if atoms.len() == 1 {
+                atoms.into_iter().next().unwrap()
+            } else {
+                format!("({})", atoms.join(" or "))
+            }
+        }
+        ConditionExpr::AllOf(pattern) => {
+            let matched = resolve_pattern_blocks(pattern, blocks);
+            let atoms: Vec<String> = matched.iter().map(|b| block_spl(b)).collect();
+            if atoms.len() == 1 {
+                atoms.into_iter().next().unwrap()
+            } else {
+                format!("({})", atoms.join(" and "))
+            }
+        }
+    }
+}
+
+/// Emit a Splunk SPL search string from a parsed `RuleAst`: a `sourcetype=`
+/// filter followed by a `| where` boolean expression built from
+/// `field="value"`/`like(...)`/`match(...)` predicates.
+pub fn to_spl(detection: &RuleAst) -> String {
+    format!(
+        "// {}\nsourcetype={}\n| where {}\n",
+        detection.title,
+        detection.source,
+        condition_spl(&detection.condition, &detection.blocks)
+    )
+}
+
+/// Parse a `field, "value"` pair out of a `like(...)`/`match(...)` call's
+/// inner argument string.
+fn split_call_args(inner: &str) -> Result<(String, String), String> {
+    let Some(idx) = inner.find(',') else {
+        return Err(format!("expected 'field, \"value\"', got: {inner}"));
+    };
+    let field = inner[..idx].trim().to_string();
+    let value = inner[idx + 1..].trim().to_string();
+    Ok((field, value))
+}
+
+/// Parse an SPL string literal `"..."` (with `\"` as an escaped quote).
+fn parse_spl_literal(s: &str) -> Result<String, String> {
+    let s = s.trim();
+    if s.len() < 2 || !s.starts_with('"') || !s.ends_with('"') {
+        return Err(format!("expected a quoted string literal, got: {s}"));
+    }
+    Ok(s[1..s.len() - 1].replace("\\\"", "\""))
+}
+
+/// Determine the wildcard modifier + bare value from a `like()` value
+/// (`%value%` -> Contains, `value%` -> StartsWith, `%value` -> EndsWith).
+fn classify_like_wildcard(literal: &str) -> Result<(Modifier, String), String> {
+    let starts = literal.starts_with('%');
+    let ends = literal.ends_with('%') && literal.len() > 1;
+    match (starts, ends) {
+        (true, true) => Ok((
+            Modifier::Contains,
+            literal[1..literal.len() - 1].to_string(),
+        )),
+        (false, true) => Ok((
+            Modifier::StartsWith,
+            literal[..literal.len() - 1].to_string(),
+        )),
+        (true, false) => Ok((Modifier::EndsWith, literal[1..].to_string())),
+        (false, false) => Err(format!("like() value has no % wildcard: {literal}")),
+    }
+}
+
+/// Parse `field="value"` / `like(field, "%value%")` / `match(field,
+/// "pattern")` (single predicate, no `and`/`or`).
+fn parse_spl_single_predicate(part: &str) -> Result<(String, Modifier, String), String> {
+    let part = part.trim();
+    if let Some(inner) = part.strip_prefix("like(").and_then(|s| s.strip_suffix(')')) {
+        let (field, value_str) = split_call_args(inner)?;
+        let literal = parse_spl_literal(&value_str)?;
+        let (modifier, value) = classify_like_wildcard(&literal)?;
+        return Ok((field, modifier, value));
+    }
+    if let Some(inner) = part
+        .strip_prefix("match(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        let (field, value_str) = split_call_args(inner)?;
+        let value = parse_spl_literal(&value_str)?;
+        return Ok((field, Modifier::Regex, value));
+    }
+    if let Some(idx) = part.find('=') {
+        let field = part[..idx].trim().to_string();
+        let value = parse_spl_literal(part[idx + 1..].trim())?;
+        return Ok((field, Modifier::Equals, value));
+    }
+    Err(format!("unsupported SPL predicate: {part}"))
+}
+
+/// Parse one atom: a single SPL predicate, or a `(pred or pred or ...)`
+/// OR-group over the same field (the shape `field_match_spl` emits for
+/// multi-value fields).
+fn parse_spl_atom_or_or_group(atom: &str) -> Result<FieldMatch, String> {
+    let inner = strip_wrapping_parens(atom);
+    let or_parts = split_top_level(inner, " or ");
+    let mut field_name: Option<String> = None;
+    let mut modifier: Option<Modifier> = None;
+    let mut values = Vec::new();
+    for part in or_parts {
+        let (field, m, value) = parse_spl_single_predicate(part.trim())?;
+        match (&field_name, modifier) {
+            (None, None) => {
+                field_name = Some(field);
+                modifier = Some(m);
+            }
+            (Some(existing_field), Some(existing_modifier)) => {
+                if *existing_field != field || existing_modifier != m {
+                    return Err(format!("OR-group mixes different fields/operators: {atom}"));
+                }
+            }
+            _ => unreachable!(),
+        }
+        values.push(value);
+    }
+    Ok(FieldMatch {
+        field: field_name.ok_or_else(|| format!("empty predicate: {atom}"))?,
+        modifier: modifier.unwrap(),
+        values,
+    })
+}
+
+/// Parse one SPL `| where` predicate expression, split on top-level ` and `,
+/// into the FieldMatch list for one selection block.
+fn parse_spl_predicate(expr: &str) -> Result<Vec<FieldMatch>, String> {
+    let expr = strip_wrapping_parens(expr);
+    let mut fields = Vec::new();
+    for atom in split_top_level(expr, " and ") {
+        fields.push(parse_spl_atom_or_or_group(atom.trim())?);
+    }
+    Ok(fields)
+}
+
+/// Parse a Splunk SPL search string (as emitted by `to_spl`, or a hand-
+/// written SPL rule of the same shape) into a `RuleAst`.
+///
+/// Expected shape: optional leading `//` comment (the title), a
+/// `sourcetype=<name>` line (quoted or bare), then one or more `| where
+/// <expr>` lines (ANDed together if there's more than one). Any other pipe
+/// stage (`| stats`, `| table`, `| eval`, ...) is rejected rather than
+/// silently ignored.
+pub fn parse_spl(spl: &str) -> Result<RuleAst, String> {
+    let mut title = "Untitled rule".to_string();
+    let mut source: Option<String> = None;
+    let mut where_exprs: Vec<String> = Vec::new();
+
+    for raw_line in spl.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if let Some(comment) = line.strip_prefix("//") {
+            if source.is_none() && title == "Untitled rule" {
+                title = comment.trim().to_string();
+            }
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix('|') {
+            let rest = rest.trim();
+            if let Some(where_expr) = rest.strip_prefix("where") {
+                where_exprs.push(where_expr.trim().to_string());
+            } else {
+                return Err(format!("unsupported SPL pipe stage: | {rest}"));
+            }
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("sourcetype=") {
+            let rest = rest.trim();
+            source = Some(if rest.starts_with('"') {
+                parse_spl_literal(rest)?
+            } else {
+                rest.to_string()
+            });
+            continue;
+        }
+        return Err(format!("unexpected SPL line: {line}"));
+    }
+
+    let Some(source) = source else {
+        return Err("no sourcetype= found in SPL search".to_string());
+    };
+    if where_exprs.is_empty() {
+        return Err("no | where clause found in SPL search".to_string());
+    }
+
+    let mut blocks = Vec::with_capacity(where_exprs.len());
+    for (i, expr) in where_exprs.iter().enumerate() {
+        let name = if where_exprs.len() == 1 {
+            "selection".to_string()
+        } else {
+            format!("selection{}", i + 1)
+        };
+        let fields = parse_spl_predicate(expr)?;
+        blocks.push(SelectionBlock { name, fields });
+    }
+
+    let condition = if blocks.len() == 1 {
+        ConditionExpr::Block(blocks[0].name.clone())
+    } else {
+        ConditionExpr::And(
+            blocks
+                .iter()
+                .map(|b| ConditionExpr::Block(b.name.clone()))
+                .collect(),
+        )
+    };
+
+    Ok(RuleAst {
+        title,
+        source,
+        blocks,
+        condition,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1157,5 +1446,73 @@ detection:
         assert_eq!(unmap_field("AccountName"), "User");
         // Not in the map at all -> passes through unchanged.
         assert_eq!(unmap_field("CommandLine"), "CommandLine");
+    }
+
+    #[test]
+    fn to_spl_emits_where_clause_from_sigma() {
+        let d = parse_sigma_rule(SIGMA_SIMPLE).unwrap();
+        let spl = to_spl(&d);
+        assert!(spl.contains("sourcetype=DeviceProcessEvents") || spl.contains("sourcetype="));
+        assert!(spl.contains("like(Image, \"%\\powershell.exe\")"));
+        assert!(spl.contains("like(CommandLine, \"%-EncodedCommand%\")"));
+        assert!(spl.contains(" and "));
+    }
+
+    #[test]
+    fn parse_spl_round_trips_simple_where() {
+        let spl = "// Suspicious PowerShell EncodedCommand\nsourcetype=WinEventLog:Security\n| where like(Image, \"%\\\\powershell.exe\") and like(CommandLine, \"%-EncodedCommand%\")\n";
+        let d = parse_spl(spl).expect("should parse");
+        assert_eq!(d.source, "WinEventLog:Security");
+        assert_eq!(d.title, "Suspicious PowerShell EncodedCommand");
+        assert_eq!(d.blocks.len(), 1);
+        assert_eq!(d.blocks[0].fields.len(), 2);
+    }
+
+    #[test]
+    fn spl_round_trip_from_sigma_preserves_logic() {
+        let sigma_ast = parse_sigma_rule(SIGMA_SIMPLE).unwrap();
+        let spl = to_spl(&sigma_ast);
+        let spl_ast = parse_spl(&spl).expect("emitted SPL should parse back");
+        assert_eq!(spl_ast.blocks[0].fields.len(), 2);
+        let regenerated_sigma = to_sigma(&spl_ast, "windows", "process_creation");
+        let sigma_ast2 =
+            parse_sigma_rule(&regenerated_sigma).expect("regenerated Sigma should parse");
+        assert_eq!(sigma_ast2.blocks[0].fields.len(), 2);
+    }
+
+    #[test]
+    fn spl_multi_value_or_group_round_trips() {
+        let sigma_ast = parse_sigma_rule(SIGMA_MULTI_VALUE).unwrap();
+        let spl = to_spl(&sigma_ast);
+        let spl_ast = parse_spl(&spl).expect("should parse OR-group");
+        assert_eq!(spl_ast.blocks[0].fields.len(), 1);
+        assert_eq!(spl_ast.blocks[0].fields[0].values.len(), 2);
+    }
+
+    #[test]
+    fn spl_equals_predicate_round_trips() {
+        let spl = "sourcetype=auth\n| where User=\"admin\"\n";
+        let d = parse_spl(spl).expect("should parse");
+        assert_eq!(d.blocks[0].fields[0].modifier, Modifier::Equals);
+        assert_eq!(d.blocks[0].fields[0].values[0], "admin");
+    }
+
+    #[test]
+    fn spl_regex_predicate_round_trips() {
+        let spl = "sourcetype=auth\n| where match(CommandLine, \"^net\\\\.exe .*\")\n";
+        let d = parse_spl(spl).expect("should parse");
+        assert_eq!(d.blocks[0].fields[0].modifier, Modifier::Regex);
+    }
+
+    #[test]
+    fn unsupported_spl_pipe_stage_is_rejected() {
+        let spl = "sourcetype=auth\n| where User=\"admin\"\n| stats count by User\n";
+        assert!(parse_spl(spl).is_err());
+    }
+
+    #[test]
+    fn spl_missing_sourcetype_is_rejected() {
+        let spl = "| where User=\"admin\"\n";
+        assert!(parse_spl(spl).is_err());
     }
 }
