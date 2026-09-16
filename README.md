@@ -27,11 +27,11 @@
 ## Features ✨
 
 - **Multi-Tool Support:**  
-  - 98,000+ **YARA** files
-  - 2,300,000+ **YARA** rules
-  - 350+ **Suricata** files
-  - 7,000+ **Sigma** files
-  - 7 **Sysmon** Configurations files
+  - 117,000+ **YARA** files
+  - 270,000+ **YARA** rules
+  - 360+ **Suricata** files
+  - 9,700+ **Sigma** files
+  - 5 **Sysmon** Configurations files
 
   - SIEMS
     - **Splunk**
