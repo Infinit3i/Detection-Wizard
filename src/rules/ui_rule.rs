@@ -137,10 +137,23 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 } else {
                     "Log Sources".to_string()
                 };
+                let ttp_count = app.ttp_selected.iter().filter(|&&v| v).count();
+                let extra_codes = !app.technique_input.trim().is_empty();
+                let ttp_header = if ttp_count > 0 || extra_codes {
+                    format!(
+                        "TTPs ({} selected{})",
+                        ttp_count,
+                        if extra_codes { " + custom" } else { "" }
+                    )
+                } else {
+                    "TTPs".to_string()
+                };
+
+                ui.columns(3, |columns| {
                 egui::CollapsingHeader::new(where_header)
                     .id_salt("where_header")
                     .default_open(app.where_tab.is_some())
-                    .show(ui, |ui| {
+                    .show(&mut columns[0], |ui| {
                         let src_sub_label = if src_count > 0 {
                             format!("General categories ({})", src_count)
                         } else {
@@ -349,9 +362,6 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     });
 
                 // ---------- APT targeting ----------
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(10.0);
                 let apt_count = app.apt_selected.iter().filter(|&&v| v).count();
                 let apt_header = if apt_count > 0 {
                     format!("APT ({} selected)", apt_count)
@@ -360,18 +370,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 };
                 egui::CollapsingHeader::new(apt_header)
                     .id_salt("apt_header")
-                    .show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new(
-                                "Nothing selected = all actors included. Selecting groups keeps \
-                                 only rules mentioning the group, its aliases, or its malware \
-                                 families.",
-                            )
-                            .size(12.0)
-                            .color(egui::Color32::GRAY),
-                        );
-                        ui.add_space(6.0);
-
+                    .show(&mut columns[1], |ui| {
                         ui.horizontal(|ui| {
                             ui.label("Search:");
                             ui.text_edit_singleline(&mut app.apt_search);
@@ -415,33 +414,9 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     .on_hover_text("Threat actors / APT groups");
 
                 // ---------- ATT&CK technique (TTP) targeting ----------
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(10.0);
-                let ttp_count = app.ttp_selected.iter().filter(|&&v| v).count();
-                let extra_codes = !app.technique_input.trim().is_empty();
-                let ttp_header = if ttp_count > 0 || extra_codes {
-                    format!(
-                        "TTPs ({} selected{})",
-                        ttp_count,
-                        if extra_codes { " + custom" } else { "" }
-                    )
-                } else {
-                    "TTPs".to_string()
-                };
                 egui::CollapsingHeader::new(ttp_header)
                     .id_salt("ttp_header")
-                    .show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new(
-                                "Nothing selected = all techniques included. Selecting techniques \
-                                 keeps only rules that reference them; a parent code also keeps \
-                                 its subtechniques (T1059 keeps T1059.001).",
-                            )
-                            .size(12.0)
-                            .color(egui::Color32::GRAY),
-                        );
-                        ui.add_space(6.0);
+                    .show(&mut columns[2], |ui| {
                         ui.horizontal(|ui| {
                             ui.label("Search:");
                             ui.text_edit_singleline(&mut app.ttp_search);
@@ -491,6 +466,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     })
                     .header_response
                     .on_hover_text("MITRE ATT&CK techniques");
+                });
 
                 ui.add_space(10.0);
                 ui.separator();

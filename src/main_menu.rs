@@ -81,7 +81,7 @@ impl App for MainApp {
                                         )
                                         .min_size(egui::vec2(300.0, 90.0))
                                         .corner_radius(12)
-                                        .fill(Color32::from_rgb(20, 130, 255)), // bright blue
+                                        .fill(Color32::from_rgb(0, 145, 255)), // brighter blue
                                     )
                                     .clicked()
                                 {
