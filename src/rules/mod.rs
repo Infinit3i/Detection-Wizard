@@ -2,6 +2,7 @@ pub mod qradar;
 pub mod rule_menu;
 pub mod sentinel;
 pub mod sigma;
+pub mod sigma_to_kql;
 pub mod splunk;
 pub mod suricata;
 pub mod sysmon;
