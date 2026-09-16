@@ -1,4 +1,4 @@
-use super::rule_menu::ToolSelectorApp;
+use super::rule_menu::{OutputMode, ToolSelectorApp};
 use super::{qradar, sentinel, sigma, splunk, suricata, sysmon, yara};
 use crate::apt_catalog::{APT_GROUPS, expand_terms};
 use crate::azure_tables::AZURE_TABLES;
@@ -593,6 +593,19 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                 }
                 }
 
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
+                ui.horizontal(|ui| {
+                    ui.label("Output as:");
+                    ui.radio_value(&mut app.output_mode, OutputMode::Native, "Native (per-tool)");
+                    ui.radio_value(&mut app.output_mode, OutputMode::Sentinel, "Sentinel (KQL)")
+                        .on_hover_text(
+                            "Convert selected Sigma rules to real KQL analytics-rule \
+                             queries and merge them into the sentinel/ output folder. \
+                             Only Sigma is converted; other tools are unaffected.",
+                        );
+                });
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);

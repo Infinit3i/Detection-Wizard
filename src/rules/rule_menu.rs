@@ -7,6 +7,24 @@ use eframe::{App, Frame, egui};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
+/// How selected tools' rules are written to the output folder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OutputMode {
+    /// Every tool's rules are written in their native format (current
+    /// behavior): Sigma stays YAML in sigma/, Sentinel stays KQL in
+    /// sentinel/, etc.
+    #[default]
+    Native,
+    /// Convertible Sigma rules are translated to real KQL analytics-rule
+    /// queries and merged into the sentinel/ folder alongside native
+    /// Sentinel rules. Sigma rules that can't be confidently converted stay
+    /// in sigma/ as YAML, same as Native mode. Other tools (Yara, Suricata,
+    /// Splunk, QRadar, Sysmon) are unaffected -- they use different rule
+    /// languages entirely and aren't Sigma-derived, so there's nothing to
+    /// convert.
+    Sentinel,
+}
+
 pub struct ToolSelectorApp {
     pub tool_names: Vec<&'static str>,
     pub selected: Vec<bool>,
@@ -56,6 +74,9 @@ pub struct ToolSelectorApp {
     pub last_filter: Option<Arc<crate::filter::CompiledFilter>>,
     /// true once filter_report.txt has been written for the current run
     pub report_written: bool,
+
+    /// Native (per-tool) vs Sentinel (convert Sigma to KQL) output mode.
+    pub output_mode: OutputMode,
 }
 
 impl Default for ToolSelectorApp {
@@ -80,6 +101,7 @@ impl Default for ToolSelectorApp {
             technique_input: String::new(),
             last_filter: None,
             report_written: false,
+            output_mode: OutputMode::default(),
         }
     }
 }
