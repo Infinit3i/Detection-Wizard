@@ -110,39 +110,41 @@ pub fn render_ui_ioc(
             if !show_progress {
                 ui.heading("Select IOC types to download:");
 
-                for (i, name) in app.ioc_types.iter().enumerate() {
-                    let _was_checked = app.selected[i];
-                    let checkbox = ui.checkbox(&mut app.selected[i], *name);
+                ui.horizontal_wrapped(|ui| {
+                    for (i, name) in app.ioc_types.iter().enumerate() {
+                        let _was_checked = app.selected[i];
+                        let checkbox = ui.checkbox(&mut app.selected[i], *name);
 
-                    if checkbox.clicked() {
-                        if *name == "All" && app.selected[i] {
-                            // Turn ON all others
-                            for j in 0..app.ioc_types.len() {
-                                app.selected[j] = true;
-                            }
-                        } else if *name == "All" && !app.selected[i] {
-                            // Turn OFF all others
-                            for j in 0..app.ioc_types.len() {
-                                app.selected[j] = false;
-                            }
-                        } else {
-                            // If any individual is unchecked, disable All
-                            let all_index = app.ioc_types.iter().position(|&x| x == "All");
-                            if let Some(idx) = all_index {
-                                app.selected[idx] = false;
-                            }
-
-                            // If all individual are now selected, check All
-                            let all_selected =
-                                app.selected[..app.ioc_types.len() - 1].iter().all(|&v| v);
-                            if all_selected {
+                        if checkbox.clicked() {
+                            if *name == "All" && app.selected[i] {
+                                // Turn ON all others
+                                for j in 0..app.ioc_types.len() {
+                                    app.selected[j] = true;
+                                }
+                            } else if *name == "All" && !app.selected[i] {
+                                // Turn OFF all others
+                                for j in 0..app.ioc_types.len() {
+                                    app.selected[j] = false;
+                                }
+                            } else {
+                                // If any individual is unchecked, disable All
+                                let all_index = app.ioc_types.iter().position(|&x| x == "All");
                                 if let Some(idx) = all_index {
-                                    app.selected[idx] = true;
+                                    app.selected[idx] = false;
+                                }
+
+                                // If all individual are now selected, check All
+                                let all_selected =
+                                    app.selected[..app.ioc_types.len() - 1].iter().all(|&v| v);
+                                if all_selected {
+                                    if let Some(idx) = all_index {
+                                        app.selected[idx] = true;
+                                    }
                                 }
                             }
                         }
                     }
-                }
+                });
 
                 ui.separator();
                 ui.label("Output format:");
