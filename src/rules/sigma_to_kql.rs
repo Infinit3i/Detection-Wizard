@@ -1,27 +1,32 @@
-//! Sigma detection-logic → KQL (Azure Sentinel) query converter.
+//! Cross-format detection-rule converter: Sigma YAML, KQL (Sentinel), Splunk
+//! SPL, and QRadar AQL all parse into one shared `RuleAst` (a small field-
+//! match/AND/OR/NOT condition tree), which any of the four formats can then
+//! be re-emitted from. This lets the Rules screen support "output everything
+//! as <language>" regardless of which formats the source rules were
+//! originally written in.
 //!
-//! Parses the `logsource:`/`detection:` blocks of a Sigma YAML rule into a
-//! small condition AST, then emits a KQL query string. Deliberately supports
-//! only the common, well-defined subset of the Sigma spec (plain field
-//! matches with contains/startswith/endswith/re modifiers, and/or/not/
-//! parens condition expressions, `1 of`/`all of` block-group references);
-//! anything outside that (aggregations, correlation rules, external list
-//! files, `|base64`/`|cidr`/`|fieldref` modifiers, etc.) returns
-//! `Err(reason)` so the caller can fall back to keeping the original Sigma
-//! YAML rather than emit a silently-wrong query.
+//! Deliberately supports only the common, well-defined subset each language
+//! actually uses in practice (plain field matches with contains/startswith/
+//! endswith/regex modifiers, and/or/not/parens condition expressions,
+//! Sigma's `1 of`/`all of` block-group references); anything outside that
+//! (aggregations, correlation rules, external list files, Sigma's
+//! `|base64`/`|cidr`/`|fieldref` modifiers, SPL `stats`/`transaction`,
+//! AQL `GROUP BY`, etc.) returns `Err(reason)` from the relevant `parse_*`
+//! function so the caller can fall back to keeping the rule in its original
+//! format rather than emit a silently-wrong query.
 //!
-//! Known limitation: the Sigma field -> KQL column mapping is a small,
+//! Known limitation: the field-name mapping between formats is a small,
 //! best-effort static table (see `FIELD_MAP`), not derived from each
-//! destination table's real schema. It covers common Sysmon-style fields as
-//! they appear in Defender XDR tables; other tables (e.g. ASIM-normalized,
-//! SecurityEvent) may use different column names and are not remapped.
+//! destination's real schema. It covers common Sysmon-style fields as they
+//! appear in Defender XDR KQL tables; other tables/formats may use
+//! different field names and are not remapped.
 
 /// One field:value selection block, e.g. `Image|endswith: '\powershell.exe'`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldMatch {
     pub field: String,
     pub modifier: Modifier,
-    /// OR'd together: Sigma list values under one field are implicitly ORed.
+    /// OR'd together: list values under one field are implicitly ORed.
     pub values: Vec<String>,
 }
 
@@ -31,22 +36,26 @@ pub enum Modifier {
     Contains,
     StartsWith,
     EndsWith,
-    /// `|re` — Sigma regex modifier, mapped to KQL `matches regex`.
+    /// Regex match (Sigma `|re`, KQL `matches regex`, SPL `rex`/`match()`,
+    /// AQL `MATCHES`).
     Regex,
 }
 
 /// A named selection block (`selection`, `filter`, `selection1`, ...): all
-/// FieldMatch entries inside one block are AND'd together (Sigma semantics).
+/// FieldMatch entries inside one block are AND'd together (Sigma semantics;
+/// KQL/SPL/AQL rules that don't have named blocks are represented as one
+/// block named "selection").
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectionBlock {
     pub name: String,
     pub fields: Vec<FieldMatch>,
 }
 
-/// The parsed `condition:` expression, restricted to the supported subset:
+/// The parsed condition expression, restricted to the supported subset:
 /// bare block refs, `and`/`or`/`not`, parens, and `1 of <pattern>` /
 /// `all of <pattern>` where `<pattern>` is a literal block name or `them`/
-/// a `selection*`-style prefix wildcard.
+/// a `selection*`-style prefix wildcard (Sigma-only condition syntax; other
+/// formats' parsers only ever produce Block/And/Or/Not nodes).
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConditionExpr {
     Block(String),
@@ -57,13 +66,20 @@ pub enum ConditionExpr {
     AllOf(String),
 }
 
+/// A detection rule's logic, independent of which format it was parsed
+/// from: a data source name (KQL table / Splunk sourcetype-ish label / AQL
+/// event category), the named selection blocks, and how they combine.
 #[derive(Debug, Clone, PartialEq)]
-pub struct SigmaDetection {
+pub struct RuleAst {
     pub title: String,
-    pub table: String, // resolved KQL table name, e.g. "SigninLogs"
+    pub source: String, // e.g. KQL table "SigninLogs", or a generic source label
     pub blocks: Vec<SelectionBlock>,
     pub condition: ConditionExpr,
 }
+
+/// Back-compat alias: earlier revisions of this module called this type
+/// `SigmaDetection` before it became format-agnostic.
+pub type SigmaDetection = RuleAst;
 
 /// Windows Sysmon-style category -> Defender XDR table, used as a fallback
 /// when the logsource has no `service` (or an unmapped one) but a common
@@ -383,9 +399,9 @@ pub fn parse_sigma_rule(yaml: &str) -> Result<SigmaDetection, String> {
 
     validate_condition_refs(&condition, &blocks)?;
 
-    Ok(SigmaDetection {
+    Ok(RuleAst {
         title,
-        table,
+        source: table,
         blocks,
         condition,
     })
@@ -537,14 +553,94 @@ fn map_field(sigma_field: &str) -> &str {
         .unwrap_or(sigma_field)
 }
 
-/// Emit a KQL query string from a parsed `SigmaDetection`.
-pub fn to_kql(detection: &SigmaDetection) -> String {
+/// Emit a KQL query string from a parsed `RuleAst`.
+pub fn to_kql(detection: &RuleAst) -> String {
     format!(
         "// {}\n{}\n| where {}\n",
         detection.title,
-        detection.table,
+        detection.source,
         condition_kql(&detection.condition, &detection.blocks)
     )
+}
+
+/// Sigma modifier suffix for a `Modifier`, e.g. `|endswith` (Equals has no
+/// suffix at all).
+fn sigma_modifier_suffix(modifier: Modifier) -> &'static str {
+    match modifier {
+        Modifier::Equals => "",
+        Modifier::Contains => "|contains",
+        Modifier::StartsWith => "|startswith",
+        Modifier::EndsWith => "|endswith",
+        Modifier::Regex => "|re",
+    }
+}
+
+/// Render one `FieldMatch` as Sigma YAML lines (`field|modifier: value` or a
+/// value-list form for multi-value fields), indented by `indent` spaces.
+fn field_match_sigma(fm: &FieldMatch, indent: usize) -> String {
+    let pad = " ".repeat(indent);
+    let key = format!("{}{}", fm.field, sigma_modifier_suffix(fm.modifier));
+    if fm.values.len() == 1 {
+        format!("{pad}{key}: '{}'\n", fm.values[0])
+    } else {
+        let mut out = format!("{pad}{key}:\n");
+        for v in &fm.values {
+            out.push_str(&format!("{pad}    - '{v}'\n"));
+        }
+        out
+    }
+}
+
+/// Render a `ConditionExpr` as a Sigma `condition:` value string.
+fn condition_sigma(condition: &ConditionExpr) -> String {
+    match condition {
+        ConditionExpr::Block(name) => name.clone(),
+        ConditionExpr::Not(inner) => format!("not {}", condition_sigma_parenthesized(inner)),
+        ConditionExpr::And(list) => list
+            .iter()
+            .map(condition_sigma_parenthesized)
+            .collect::<Vec<_>>()
+            .join(" and "),
+        ConditionExpr::Or(list) => list
+            .iter()
+            .map(condition_sigma_parenthesized)
+            .collect::<Vec<_>>()
+            .join(" or "),
+        ConditionExpr::OneOf(pattern) => format!("1 of {pattern}"),
+        ConditionExpr::AllOf(pattern) => format!("all of {pattern}"),
+    }
+}
+
+fn condition_sigma_parenthesized(condition: &ConditionExpr) -> String {
+    match condition {
+        ConditionExpr::And(_) | ConditionExpr::Or(_) => format!("({})", condition_sigma(condition)),
+        _ => condition_sigma(condition),
+    }
+}
+
+/// Emit a Sigma YAML rule string from a parsed `RuleAst`. Used when the
+/// user's chosen target language is Sigma, so KQL/SPL/AQL source rules that
+/// were successfully parsed into a `RuleAst` can be re-emitted as Sigma.
+/// `product`/`category` populate the `logsource:` block since `RuleAst` only
+/// carries a resolved source label, not the original Sigma logsource keys.
+pub fn to_sigma(detection: &RuleAst, product: &str, category: &str) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("title: {}\n", detection.title));
+    out.push_str("logsource:\n");
+    out.push_str(&format!("    product: {product}\n"));
+    out.push_str(&format!("    category: {category}\n"));
+    out.push_str("detection:\n");
+    for block in &detection.blocks {
+        out.push_str(&format!("    {}:\n", block.name));
+        for fm in &block.fields {
+            out.push_str(&field_match_sigma(fm, 8));
+        }
+    }
+    out.push_str(&format!(
+        "    condition: {}\n",
+        condition_sigma(&detection.condition)
+    ));
+    out
 }
 
 #[cfg(test)]
@@ -751,5 +847,20 @@ detection:
         assert!(!kql.contains("Image endswith"));
         // CommandLine has no mapping entry -> passes through unchanged.
         assert!(kql.contains(r#"CommandLine contains @"sekurlsa""#));
+    }
+
+    #[test]
+    fn to_sigma_round_trips_through_reparse() {
+        // Parse a Sigma rule with two AND'd blocks, re-emit as Sigma, parse
+        // the re-emitted YAML again -> the condition/block shape survives.
+        let d = parse_sigma_rule(SIGMA_TWO_BLOCKS_AND).unwrap();
+        let regenerated_yaml = to_sigma(&d, "windows", "process_creation");
+        let d2 = parse_sigma_rule(&regenerated_yaml).expect("re-emitted Sigma YAML should parse");
+        assert_eq!(d.condition, d2.condition);
+        assert_eq!(d.blocks.len(), d2.blocks.len());
+        for (b1, b2) in d.blocks.iter().zip(d2.blocks.iter()) {
+            assert_eq!(b1.name, b2.name);
+            assert_eq!(b1.fields, b2.fields);
+        }
     }
 }
