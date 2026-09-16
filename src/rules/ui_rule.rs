@@ -436,8 +436,11 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                                     if !g.matches_search(&needle) {
                                         continue;
                                     }
-                                    let label =
-                                        format!("{} ({}) — {}", g.name, g.mitre_id, g.origin);
+                                    let label = if g.origin.is_empty() {
+                                        format!("{} ({})", g.name, g.mitre_id)
+                                    } else {
+                                        format!("{} ({}) — {}", g.name, g.mitre_id, g.origin)
+                                    };
                                     ui.checkbox(&mut app.apt_selected[i], label)
                                         .on_hover_text(format!(
                                             "Aliases: {}\nSoftware: {}",
