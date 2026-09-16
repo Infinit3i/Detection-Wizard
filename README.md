@@ -28,15 +28,15 @@
 
 - **Multi-Tool Support:**  
   - 98,000+ **YARA** files
-      - 2,300,000+ **YARA** rules
+  - 2,300,000+ **YARA** rules
   - 350+ **Suricata** files
   - 7,000+ **Sigma** files
   - 7 **Sysmon** Configurations files
- 
+
   - SIEMS
-    - **Splunk**: Detection configurations for Splunk environments. 📈
-    - **QRadar**: Detections for IBM QRadar SIEM
-    - **Sentinel**: Detection configurations for Microsoft Sentinel (KQL) 🔷
+    - **Splunk**
+    - **QRadar**
+    - **Sentinel**
 
 - **Cross-format rule conversion:**  
   Check any of **Sigma**, **Splunk**, **QRadar**, or **Sentinel** as an output target and every selected tool's filtered rules are translated into that rule language where the translation can be done safely (plain field matches, and/or/not, 1-of/all-of, regex). Rules that use constructs outside that supported subset (aggregations, correlation rules, exotic modifiers) are left in their original format rather than risk emitting a wrong detection. Check more than one target (e.g. Splunk + Sentinel) and you get independent output folders for each.
