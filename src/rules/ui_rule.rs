@@ -122,7 +122,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     }
                 });
 
-                // ---------- Log sources / tables / sourcetypes (one combined dropdown) ----------
+                // ---------- Log sources / APT / TTPs (one filter section, full width) ----------
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
@@ -133,15 +133,21 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 let st_count = app.sourcetype_selected.iter().filter(|&&v| v).count();
                 let where_total = src_count + table_count + st_count;
                 let where_header = if where_total > 0 {
-                    format!("Log Sources ({} selected)", where_total)
+                    format!("Log Sources ({})", where_total)
                 } else {
                     "Log Sources".to_string()
+                };
+                let apt_count = app.apt_selected.iter().filter(|&&v| v).count();
+                let apt_header = if apt_count > 0 {
+                    format!("APT ({})", apt_count)
+                } else {
+                    "APT".to_string()
                 };
                 let ttp_count = app.ttp_selected.iter().filter(|&&v| v).count();
                 let extra_codes = !app.technique_input.trim().is_empty();
                 let ttp_header = if ttp_count > 0 || extra_codes {
                     format!(
-                        "TTPs ({} selected{})",
+                        "TTPs ({}{})",
                         ttp_count,
                         if extra_codes { " + custom" } else { "" }
                     )
@@ -149,11 +155,52 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     "TTPs".to_string()
                 };
 
-                ui.columns(3, |columns| {
-                egui::CollapsingHeader::new(where_header)
-                    .id_salt("where_header")
-                    .default_open(app.where_tab.is_some())
-                    .show(&mut columns[0], |ui| {
+                // Top-level tab row: clicking a tab opens its full-width body below
+                // and closes the others; clicking the open tab collapses it.
+                ui.horizontal(|ui| {
+                    if ui
+                        .selectable_label(app.filter_tab == Some(0), where_header)
+                        .clicked()
+                    {
+                        app.filter_tab = if app.filter_tab == Some(0) {
+                            None
+                        } else {
+                            // Auto-open "General categories" the first time Log
+                            // Sources is expanded.
+                            if app.where_tab.is_none() {
+                                app.where_tab = Some(0);
+                            }
+                            Some(0)
+                        };
+                    }
+                    if ui
+                        .selectable_label(app.filter_tab == Some(1), apt_header)
+                        .on_hover_text("Threat actors / APT groups")
+                        .clicked()
+                    {
+                        app.filter_tab = if app.filter_tab == Some(1) {
+                            None
+                        } else {
+                            Some(1)
+                        };
+                    }
+                    if ui
+                        .selectable_label(app.filter_tab == Some(2), ttp_header)
+                        .on_hover_text("MITRE ATT&CK techniques")
+                        .clicked()
+                    {
+                        app.filter_tab = if app.filter_tab == Some(2) {
+                            None
+                        } else {
+                            Some(2)
+                        };
+                    }
+                });
+                ui.add_space(8.0);
+
+                match app.filter_tab {
+                    // ---- Log Sources: General categories / Azure tables / Splunk sourcetypes ----
+                    Some(0) => {
                         let src_sub_label = if src_count > 0 {
                             format!("General categories ({})", src_count)
                         } else {
@@ -170,7 +217,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             "Splunk sourcetypes".to_string()
                         };
 
-                        // Tab row: clicking a tab opens it and closes the others;
+                        // Sub-tab row: clicking a tab opens it and closes the others;
                         // clicking the already-open tab collapses it.
                         ui.horizontal(|ui| {
                             if ui
@@ -257,7 +304,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 let needle = app.azure_table_search.to_lowercase();
                                 egui::ScrollArea::vertical()
                                     .id_salt("azure_table_scroll")
-                                    .max_height(220.0)
+                                    .max_height(320.0)
                                     .show(ui, |ui| {
                                         let mut last_category = "";
                                         for (i, def) in AZURE_TABLES.iter().enumerate() {
@@ -319,7 +366,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 let st_needle = app.sourcetype_search.to_lowercase();
                                 egui::ScrollArea::vertical()
                                     .id_salt("sourcetype_scroll")
-                                    .max_height(220.0)
+                                    .max_height(320.0)
                                     .show(ui, |ui| {
                                         let mut last_category = "";
                                         for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
@@ -359,18 +406,10 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
 
                             _ => {}
                         }
-                    });
+                    }
 
-                // ---------- APT targeting ----------
-                let apt_count = app.apt_selected.iter().filter(|&&v| v).count();
-                let apt_header = if apt_count > 0 {
-                    format!("APT ({} selected)", apt_count)
-                } else {
-                    "APT".to_string()
-                };
-                egui::CollapsingHeader::new(apt_header)
-                    .id_salt("apt_header")
-                    .show(&mut columns[1], |ui| {
+                    // ---- APT ----
+                    Some(1) => {
                         ui.horizontal(|ui| {
                             ui.label("Search:");
                             ui.text_edit_singleline(&mut app.apt_search);
@@ -385,7 +424,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         let needle = app.apt_search.to_lowercase();
                         egui::ScrollArea::vertical()
                             .id_salt("apt_scroll")
-                            .max_height(220.0)
+                            .max_height(320.0)
                             .show(ui, |ui| {
                                 for (i, g) in APT_GROUPS.iter().enumerate() {
                                     if !g.matches_search(&needle) {
@@ -409,14 +448,10 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 "Actor or malware names not in the list, e.g. Vidar, RedLine",
                             );
                         });
-                    })
-                    .header_response
-                    .on_hover_text("Threat actors / APT groups");
+                    }
 
-                // ---------- ATT&CK technique (TTP) targeting ----------
-                egui::CollapsingHeader::new(ttp_header)
-                    .id_salt("ttp_header")
-                    .show(&mut columns[2], |ui| {
+                    // ---- TTPs ----
+                    Some(2) => {
                         ui.horizontal(|ui| {
                             ui.label("Search:");
                             ui.text_edit_singleline(&mut app.ttp_search);
@@ -431,7 +466,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         let ttp_needle = app.ttp_search.to_lowercase();
                         egui::ScrollArea::vertical()
                             .id_salt("ttp_scroll")
-                            .max_height(260.0)
+                            .max_height(320.0)
                             .show(ui, |ui| {
                                 let mut last_tactic = "";
                                 for (i, def) in TTP_CATALOG.iter().enumerate() {
@@ -463,10 +498,10 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             ui.text_edit_singleline(&mut app.technique_input)
                                 .on_hover_text("Codes not in the list, e.g. T1621, T1651");
                         });
-                    })
-                    .header_response
-                    .on_hover_text("MITRE ATT&CK techniques");
-                });
+                    }
+
+                    _ => {}
+                }
 
                 ui.add_space(10.0);
                 ui.separator();

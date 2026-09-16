@@ -45,6 +45,10 @@ pub struct ToolSelectorApp {
     /// None = all collapsed
     pub where_tab: Option<usize>,
 
+    /// which top-level filter section is expanded (0=Log Sources, 1=APT,
+    /// 2=TTPs); only one at a time, None = all collapsed
+    pub filter_tab: Option<usize>,
+
     // --- Targeting: MITRE ATT&CK techniques ---
     /// parallel to crate::ttp_catalog::TTP_CATALOG; all false = no TTP filter
     pub ttp_selected: Vec<bool>,
@@ -79,6 +83,7 @@ impl Default for ToolSelectorApp {
             sourcetype_selected: vec![false; SPLUNK_SOURCETYPES.len()],
             sourcetype_search: String::new(),
             where_tab: None,
+            filter_tab: None,
             ttp_selected: vec![false; TTP_CATALOG.len()],
             ttp_search: String::new(),
             technique_input: String::new(),
