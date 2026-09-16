@@ -643,6 +643,242 @@ pub fn to_sigma(detection: &RuleAst, product: &str, category: &str) -> String {
     out
 }
 
+/// Parse a KQL analytics-rule query (as emitted by `to_kql`, or a hand-
+/// written Sentinel rule of the same shape) into a `RuleAst`.
+///
+/// Expected shape: optional leading `//` comment lines (the first becomes
+/// the title), then a bare table name line, then one or more `| where
+/// <expr>` lines (ANDed together if there's more than one). Any other pipe
+/// stage (`| summarize`, `| project`, `| extend`, ...) is rejected rather
+/// than silently ignored, since it could change the query's meaning.
+pub fn parse_kql(kql: &str) -> Result<RuleAst, String> {
+    let mut title = "Untitled rule".to_string();
+    let mut table: Option<String> = None;
+    let mut where_exprs: Vec<String> = Vec::new();
+    let mut seen_table_line = false;
+
+    for raw_line in kql.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if let Some(comment) = line.strip_prefix("//") {
+            if table.is_none() && title == "Untitled rule" {
+                title = comment.trim().to_string();
+            }
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix('|') {
+            let rest = rest.trim();
+            if let Some(where_expr) = rest.strip_prefix("where") {
+                where_exprs.push(where_expr.trim().to_string());
+            } else {
+                return Err(format!("unsupported KQL pipe stage: | {rest}"));
+            }
+            continue;
+        }
+        if !seen_table_line {
+            table = Some(line.to_string());
+            seen_table_line = true;
+            continue;
+        }
+        return Err(format!("unexpected KQL line: {line}"));
+    }
+
+    let Some(table) = table else {
+        return Err("no table name found in KQL query".to_string());
+    };
+    if where_exprs.is_empty() {
+        return Err("no | where clause found in KQL query".to_string());
+    }
+
+    // Each `| where` line is its own AND'd predicate expression; parse each
+    // into a small selection block and AND the blocks together via an
+    // ANDed condition (or a single Block reference if there's only one).
+    let mut blocks = Vec::with_capacity(where_exprs.len());
+    for (i, expr) in where_exprs.iter().enumerate() {
+        let name = if where_exprs.len() == 1 {
+            "selection".to_string()
+        } else {
+            format!("selection{}", i + 1)
+        };
+        let fields = parse_kql_predicate(expr)?;
+        blocks.push(SelectionBlock { name, fields });
+    }
+
+    let condition = if blocks.len() == 1 {
+        ConditionExpr::Block(blocks[0].name.clone())
+    } else {
+        ConditionExpr::And(
+            blocks
+                .iter()
+                .map(|b| ConditionExpr::Block(b.name.clone()))
+                .collect(),
+        )
+    };
+
+    Ok(RuleAst {
+        title,
+        source: table,
+        blocks,
+        condition,
+    })
+}
+
+/// Reverse of `map_field`: KQL column name -> Sigma-style field name, when
+/// there's a unique FIELD_MAP entry for it. Falls through unchanged when
+/// there's no mapping (or the column is ambiguous, e.g. FolderPath maps
+/// from both Image and TargetFilename -- in that case the KQL column name
+/// itself is kept as the field name).
+fn unmap_field(kql_field: &str) -> String {
+    let matches: Vec<&str> = FIELD_MAP
+        .iter()
+        .filter(|(_, v)| *v == kql_field)
+        .map(|(k, _)| *k)
+        .collect();
+    if matches.len() == 1 {
+        matches[0].to_string()
+    } else {
+        kql_field.to_string()
+    }
+}
+
+/// Strip a single layer of fully-wrapping parentheses, e.g. `"(a and b)"` ->
+/// `"a and b"`. Only strips when the outermost `(` and its matching `)`
+/// actually wrap the entire string (not e.g. `"(a) and (b)"`).
+fn strip_wrapping_parens(expr: &str) -> &str {
+    let trimmed = expr.trim();
+    if !trimmed.starts_with('(') || !trimmed.ends_with(')') {
+        return trimmed;
+    }
+    let mut depth = 0i32;
+    for (i, c) in trimmed.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 && i != trimmed.len() - 1 {
+                    // the first '(' closes before the end -> not a full wrap
+                    return trimmed;
+                }
+            }
+            _ => {}
+        }
+    }
+    &trimmed[1..trimmed.len() - 1]
+}
+
+/// Parse one KQL `| where` predicate expression, split on top-level ` and `
+/// (case-sensitive lowercase `and`, matching what `to_kql` emits), into the
+/// FieldMatch list for one selection block. Each atom must be
+/// `<field> <op> @"<value>"` (optionally `(atom or atom or ...)` for a
+/// single field's multi-value OR group, as emitted by `field_match_kql`).
+/// Anything else (KQL functions, `in~ (...)`, numeric comparisons, nested
+/// AND/OR of different fields) is rejected.
+fn parse_kql_predicate(expr: &str) -> Result<Vec<FieldMatch>, String> {
+    let expr = strip_wrapping_parens(expr);
+    let mut fields = Vec::new();
+    for atom in split_top_level(expr, " and ") {
+        fields.push(parse_kql_atom_or_or_group(atom.trim())?);
+    }
+    Ok(fields)
+}
+
+/// Split `expr` on a literal separator that isn't inside parentheses.
+fn split_top_level<'a>(expr: &'a str, sep: &str) -> Vec<&'a str> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+    let bytes = expr.as_bytes();
+    let sep_bytes = sep.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'(' => depth += 1,
+            b')' => depth -= 1,
+            _ => {}
+        }
+        if depth == 0 && expr[i..].starts_with(sep) {
+            parts.push(&expr[start..i]);
+            i += sep_bytes.len();
+            start = i;
+            continue;
+        }
+        i += 1;
+    }
+    parts.push(&expr[start..]);
+    parts
+}
+
+/// Parse one atom: either a single `field op @"value"` predicate, or a
+/// `(field op @"v1" or field op @"v2" ...)` OR-group over the same field
+/// (the shape `field_match_kql` emits for multi-value fields).
+fn parse_kql_atom_or_or_group(atom: &str) -> Result<FieldMatch, String> {
+    let inner = atom
+        .strip_prefix('(')
+        .and_then(|s| s.strip_suffix(')'))
+        .unwrap_or(atom);
+    let or_parts = split_top_level(inner, " or ");
+    let mut field_name: Option<String> = None;
+    let mut modifier: Option<Modifier> = None;
+    let mut values = Vec::new();
+    for part in or_parts {
+        let (field, m, value) = parse_kql_single_predicate(part.trim())?;
+        match (&field_name, modifier) {
+            (None, None) => {
+                field_name = Some(field);
+                modifier = Some(m);
+            }
+            (Some(existing_field), Some(existing_modifier)) => {
+                if *existing_field != field || existing_modifier != m {
+                    return Err(format!("OR-group mixes different fields/operators: {atom}"));
+                }
+            }
+            _ => unreachable!(),
+        }
+        values.push(value);
+    }
+    Ok(FieldMatch {
+        field: unmap_field(&field_name.ok_or_else(|| format!("empty predicate: {atom}"))?),
+        modifier: modifier.unwrap(),
+        values,
+    })
+}
+
+/// Parse `field OP @"value"` (single predicate, no `and`/`or`).
+fn parse_kql_single_predicate(part: &str) -> Result<(String, Modifier, String), String> {
+    const OPS: &[(&str, Modifier)] = &[
+        (" matches regex ", Modifier::Regex),
+        (" contains ", Modifier::Contains),
+        (" startswith ", Modifier::StartsWith),
+        (" endswith ", Modifier::EndsWith),
+        (" =~ ", Modifier::Equals),
+    ];
+    for (op_str, modifier) in OPS {
+        if let Some(idx) = part.find(op_str) {
+            let field = part[..idx].trim().to_string();
+            let value_part = part[idx + op_str.len()..].trim();
+            let value = parse_kql_literal(value_part)?;
+            return Ok((field, *modifier, value));
+        }
+    }
+    Err(format!("unsupported KQL predicate: {part}"))
+}
+
+/// Parse a KQL verbatim string literal `@"..."` (with `""` as an escaped
+/// quote inside), the only literal form `to_kql` emits.
+fn parse_kql_literal(s: &str) -> Result<String, String> {
+    let Some(rest) = s.strip_prefix("@\"") else {
+        return Err(format!(
+            "expected a verbatim string literal @\"...\", got: {s}"
+        ));
+    };
+    let Some(rest) = rest.strip_suffix('"') else {
+        return Err(format!("unterminated string literal: {s}"));
+    };
+    Ok(rest.replace("\"\"", "\""))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -862,5 +1098,64 @@ detection:
             assert_eq!(b1.name, b2.name);
             assert_eq!(b1.fields, b2.fields);
         }
+    }
+
+    const KQL_SIMPLE: &str = "// Suspicious PowerShell EncodedCommand\nDeviceProcessEvents\n| where FolderPath endswith @\"\\powershell.exe\" and CommandLine contains @\"-EncodedCommand\"\n";
+
+    #[test]
+    fn parses_simple_kql_where_clause() {
+        let d = parse_kql(KQL_SIMPLE).expect("should parse");
+        assert_eq!(d.source, "DeviceProcessEvents");
+        assert_eq!(d.title, "Suspicious PowerShell EncodedCommand");
+        assert_eq!(d.blocks.len(), 1);
+        assert_eq!(d.blocks[0].fields.len(), 2);
+    }
+
+    #[test]
+    fn kql_round_trip_from_sigma_preserves_logic() {
+        // Sigma -> KQL -> parse_kql -> to_sigma -> parse_sigma_rule: the
+        // field/modifier/value shape survives the full round trip.
+        let sigma_ast = parse_sigma_rule(SIGMA_SIMPLE).unwrap();
+        let kql = to_kql(&sigma_ast);
+        let kql_ast = parse_kql(&kql).expect("emitted KQL should parse back");
+        assert_eq!(kql_ast.source, "DeviceProcessEvents");
+        let regenerated_sigma = to_sigma(&kql_ast, "windows", "process_creation");
+        let sigma_ast2 =
+            parse_sigma_rule(&regenerated_sigma).expect("regenerated Sigma should parse");
+        // FolderPath is ambiguous (maps from both Image and TargetFilename),
+        // so unmap_field intentionally leaves it as-is rather than guess.
+        let fields: Vec<&str> = sigma_ast2.blocks[0]
+            .fields
+            .iter()
+            .map(|f| f.field.as_str())
+            .collect();
+        assert!(
+            fields.contains(&"FolderPath"),
+            "fields were: {fields:?}, regenerated sigma was:\n{regenerated_sigma}"
+        );
+        assert!(fields.contains(&"CommandLine"));
+    }
+
+    #[test]
+    fn kql_multi_value_or_group_round_trips() {
+        let sigma_ast = parse_sigma_rule(SIGMA_MULTI_VALUE).unwrap();
+        let kql = to_kql(&sigma_ast);
+        let kql_ast = parse_kql(&kql).expect("should parse OR-group");
+        assert_eq!(kql_ast.blocks[0].fields.len(), 1);
+        assert_eq!(kql_ast.blocks[0].fields[0].values.len(), 2);
+    }
+
+    #[test]
+    fn unsupported_kql_pipe_stage_is_rejected() {
+        let kql = "DeviceProcessEvents\n| where FolderPath endswith @\"\\net.exe\"\n| summarize count() by FolderPath\n";
+        assert!(parse_kql(kql).is_err());
+    }
+
+    #[test]
+    fn unmap_field_reverses_unambiguous_mapping() {
+        assert_eq!(unmap_field("RemoteIP"), "DestinationIp");
+        assert_eq!(unmap_field("AccountName"), "User");
+        // Not in the map at all -> passes through unchanged.
+        assert_eq!(unmap_field("CommandLine"), "CommandLine");
     }
 }
