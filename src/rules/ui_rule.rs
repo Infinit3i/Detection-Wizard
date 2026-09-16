@@ -12,6 +12,8 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_menu: impl FnMut()) {
+    // Hover text (e.g. on shortened filter labels) waits 2s before showing.
+    ctx.style_mut(|style| style.interaction.tooltip_delay = 2.0);
     egui::CentralPanel::default()
         .frame(
             egui::Frame::default()
@@ -352,9 +354,9 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 ui.add_space(10.0);
                 let apt_count = app.apt_selected.iter().filter(|&&v| v).count();
                 let apt_header = if apt_count > 0 {
-                    format!("Threat actors / APT groups ({} selected)", apt_count)
+                    format!("APT ({} selected)", apt_count)
                 } else {
-                    "Threat actors / APT groups".to_string()
+                    "APT".to_string()
                 };
                 egui::CollapsingHeader::new(apt_header)
                     .id_salt("apt_header")
@@ -408,7 +410,9 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 "Actor or malware names not in the list, e.g. Vidar, RedLine",
                             );
                         });
-                    });
+                    })
+                    .header_response
+                    .on_hover_text("Threat actors / APT groups");
 
                 // ---------- ATT&CK technique (TTP) targeting ----------
                 ui.add_space(10.0);
@@ -418,12 +422,12 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 let extra_codes = !app.technique_input.trim().is_empty();
                 let ttp_header = if ttp_count > 0 || extra_codes {
                     format!(
-                        "MITRE ATT&CK techniques ({} selected{})",
+                        "TTPs ({} selected{})",
                         ttp_count,
                         if extra_codes { " + custom" } else { "" }
                     )
                 } else {
-                    "MITRE ATT&CK techniques".to_string()
+                    "TTPs".to_string()
                 };
                 egui::CollapsingHeader::new(ttp_header)
                     .id_salt("ttp_header")
@@ -484,7 +488,9 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             ui.text_edit_singleline(&mut app.technique_input)
                                 .on_hover_text("Codes not in the list, e.g. T1621, T1651");
                         });
-                    });
+                    })
+                    .header_response
+                    .on_hover_text("MITRE ATT&CK techniques");
 
                 ui.add_space(10.0);
                 ui.separator();
