@@ -125,32 +125,19 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 let st_count = app.sourcetype_selected.iter().filter(|&&v| v).count();
                 let where_total = src_count + table_count + st_count;
                 let where_header = if where_total > 0 {
-                    format!("Where the logs come from ({} selected)", where_total)
+                    format!("Log Sources ({} selected)", where_total)
                 } else {
-                    "Where the logs come from (all included)".to_string()
+                    "Log Sources (all included)".to_string()
                 };
                 egui::CollapsingHeader::new(where_header)
                     .id_salt("where_header")
                     .default_open(app.azure_tables_open || app.sourcetypes_open)
                     .show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new(
-                                "Nothing selected in any of the three lists below = everything \
-                                 included. A rule passes if it positively matches ANY selection \
-                                 across log sources, tables, or sourcetypes (they OR together); \
-                                 unclassifiable rules are dropped once any of the three is active \
-                                 (strict).",
-                            )
-                            .size(12.0)
-                            .color(egui::Color32::GRAY),
-                        );
-                        ui.add_space(8.0);
-
                         // ---- Log sources (coarse buckets) ----
                         let src_sub_header = if src_count > 0 {
-                            format!("Log sources ({} selected)", src_count)
+                            format!("General categories ({} selected)", src_count)
                         } else {
-                            "Log sources (all included)".to_string()
+                            "General categories (all included)".to_string()
                         };
                         egui::CollapsingHeader::new(src_sub_header)
                             .id_salt("log_sources_header")
