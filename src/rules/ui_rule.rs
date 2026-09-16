@@ -1,4 +1,4 @@
-use super::rule_menu::{TargetLanguage, ToolSelectorApp};
+use super::rule_menu::ToolSelectorApp;
 use super::{qradar, sentinel, sigma, splunk, suricata, sysmon, yara};
 use crate::apt_catalog::{APT_GROUPS, expand_terms};
 use crate::azure_tables::AZURE_TABLES;
@@ -596,36 +596,36 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
-                ui.horizontal(|ui| {
-                    ui.label("Convert all output to:");
-                    let current_label = match app.output_mode {
-                        None => "No conversion (native per-tool)",
-                        Some(lang) => lang.label(),
-                    };
-                    egui::ComboBox::from_id_salt("target_language_combo")
-                        .selected_text(current_label)
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut app.output_mode,
-                                None,
-                                "No conversion (native per-tool)",
-                            );
-                            for lang in TargetLanguage::ALL {
-                                ui.selectable_value(&mut app.output_mode, Some(lang), lang.label());
-                            }
+                {
+                    let targets: Vec<&str> = ["Sigma", "Splunk", "QRadar", "Sentinel"]
+                        .iter()
+                        .filter(|name| {
+                            app.tool_names
+                                .iter()
+                                .position(|n| n == *name)
+                                .map(|i| app.selected[i])
+                                .unwrap_or(false)
                         })
-                        .response
+                        .copied()
+                        .collect();
+                    if !targets.is_empty() {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Every selected tool's convertible rules will also be output as: {}",
+                                targets.join(", ")
+                            ))
+                            .weak(),
+                        )
                         .on_hover_text(
-                            "Convert every selected tool's rules that can be parsed into the \
-                             shared rule model to this one language. Rules that can't be \
+                            "Checking Sigma/Splunk/QRadar/Sentinel above creates a matching \
+                             output subfolder containing every selected tool's filtered rules, \
+                             converted into that format where possible. Rules that can't be \
                              confidently converted (aggregations, correlation rules, exotic \
-                             modifiers) stay in their original format rather than risk a wrong \
-                             translation.",
+                             modifiers) stay in their original format/folder instead.",
                         );
-                });
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(10.0);
+                        ui.add_space(10.0);
+                    }
+                }
                 render_output_path_selector(ui, &mut app.custom_path, "./rule_output");
 
                 ui.add_space(20.0);

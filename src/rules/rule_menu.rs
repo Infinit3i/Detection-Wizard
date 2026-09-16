@@ -7,12 +7,12 @@ use eframe::{App, Frame, egui};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
-/// The single rule language all selected tools' output is converted into.
-/// `None` means "no conversion" (current/native behavior: every tool keeps
-/// its own format in its own subfolder). `Some(lang)` means every rule that
-/// can be parsed into the shared `RuleAst` gets re-emitted as `lang`;
-/// anything that can't be confidently converted stays in its original
-/// format and folder rather than risk a wrong translation.
+/// The four tool checkboxes that also double as convertible rule-language
+/// targets. When one of these is checked in `selected`, its output folder
+/// receives every selected tool's filtered rules converted into that
+/// format (via the shared `RuleAst` in `sigma_to_kql.rs`), in addition to
+/// its own native rules. Rules that can't be confidently converted stay in
+/// their original format/folder rather than risk a wrong translation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetLanguage {
     Sigma,
@@ -22,12 +22,18 @@ pub enum TargetLanguage {
 }
 
 impl TargetLanguage {
-    pub const ALL: [TargetLanguage; 4] = [
-        TargetLanguage::Sigma,
-        TargetLanguage::Splunk,
-        TargetLanguage::QRadar,
-        TargetLanguage::Sentinel,
-    ];
+    /// Maps a tool-checkbox name to its `TargetLanguage`, if that tool is
+    /// one of the four convertible formats (Yara/Suricata/Sysmon/All are
+    /// not rule-language targets, so they return `None`).
+    pub fn from_tool_name(name: &str) -> Option<TargetLanguage> {
+        match name {
+            "Sigma" => Some(TargetLanguage::Sigma),
+            "Splunk" => Some(TargetLanguage::Splunk),
+            "QRadar" => Some(TargetLanguage::QRadar),
+            "Sentinel" => Some(TargetLanguage::Sentinel),
+            _ => None,
+        }
+    }
 
     pub fn label(&self) -> &'static str {
         match self {
@@ -88,10 +94,6 @@ pub struct ToolSelectorApp {
     pub last_filter: Option<Arc<crate::filter::CompiledFilter>>,
     /// true once filter_report.txt has been written for the current run
     pub report_written: bool,
-
-    /// Comment above the field kept for clarity: `None` = per-tool native
-    /// output, `Some(lang)` = convert everything convertible to `lang`.
-    pub output_mode: Option<TargetLanguage>,
 }
 
 impl Default for ToolSelectorApp {
@@ -116,7 +118,6 @@ impl Default for ToolSelectorApp {
             technique_input: String::new(),
             last_filter: None,
             report_written: false,
-            output_mode: None,
         }
     }
 }
