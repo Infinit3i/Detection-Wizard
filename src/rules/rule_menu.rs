@@ -33,16 +33,17 @@ pub struct ToolSelectorApp {
     pub azure_table_selected: Vec<bool>,
     /// live search box for the table list
     pub azure_table_search: String,
-    /// show/hide the Azure table picker section
-    pub azure_tables_open: bool,
 
     // --- Targeting: granular Splunk sourcetypes ---
     /// parallel to crate::splunk_sourcetypes::SPLUNK_SOURCETYPES; all false = filter off
     pub sourcetype_selected: Vec<bool>,
     /// live search box for the sourcetype list
     pub sourcetype_search: String,
-    /// show/hide the Splunk sourcetype picker section
-    pub sourcetypes_open: bool,
+
+    /// which of the three "log sources" sub-pickers is expanded (General
+    /// categories / Azure tables / Splunk sourcetypes); only one at a time,
+    /// None = all collapsed
+    pub where_tab: Option<usize>,
 
     // --- Targeting: MITRE ATT&CK techniques ---
     /// parallel to crate::ttp_catalog::TTP_CATALOG; all false = no TTP filter
@@ -75,10 +76,9 @@ impl Default for ToolSelectorApp {
             apt_custom_terms: String::new(),
             azure_table_selected: vec![false; AZURE_TABLES.len()],
             azure_table_search: String::new(),
-            azure_tables_open: false,
             sourcetype_selected: vec![false; SPLUNK_SOURCETYPES.len()],
             sourcetype_search: String::new(),
-            sourcetypes_open: false,
+            where_tab: None,
             ttp_selected: vec![false; TTP_CATALOG.len()],
             ttp_search: String::new(),
             technique_input: String::new(),

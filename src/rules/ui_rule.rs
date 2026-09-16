@@ -131,17 +131,63 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 };
                 egui::CollapsingHeader::new(where_header)
                     .id_salt("where_header")
-                    .default_open(app.azure_tables_open || app.sourcetypes_open)
+                    .default_open(app.where_tab.is_some())
                     .show(ui, |ui| {
-                        // ---- Log sources (coarse buckets) ----
-                        let src_sub_header = if src_count > 0 {
-                            format!("General categories ({} selected)", src_count)
+                        let src_sub_label = if src_count > 0 {
+                            format!("General categories ({})", src_count)
                         } else {
                             "General categories".to_string()
                         };
-                        egui::CollapsingHeader::new(src_sub_header)
-                            .id_salt("log_sources_header")
-                            .show(ui, |ui| {
+                        let table_sub_label = if table_count > 0 {
+                            format!("Azure / M365 log tables ({})", table_count)
+                        } else {
+                            "Azure / M365 log tables".to_string()
+                        };
+                        let st_sub_label = if st_count > 0 {
+                            format!("Splunk sourcetypes ({})", st_count)
+                        } else {
+                            "Splunk sourcetypes".to_string()
+                        };
+
+                        // Tab row: clicking a tab opens it and closes the others;
+                        // clicking the already-open tab collapses it.
+                        ui.horizontal(|ui| {
+                            if ui
+                                .selectable_label(app.where_tab == Some(0), src_sub_label)
+                                .clicked()
+                            {
+                                app.where_tab = if app.where_tab == Some(0) {
+                                    None
+                                } else {
+                                    Some(0)
+                                };
+                            }
+                            if ui
+                                .selectable_label(app.where_tab == Some(1), table_sub_label)
+                                .clicked()
+                            {
+                                app.where_tab = if app.where_tab == Some(1) {
+                                    None
+                                } else {
+                                    Some(1)
+                                };
+                            }
+                            if ui
+                                .selectable_label(app.where_tab == Some(2), st_sub_label)
+                                .clicked()
+                            {
+                                app.where_tab = if app.where_tab == Some(2) {
+                                    None
+                                } else {
+                                    Some(2)
+                                };
+                            }
+                        });
+                        ui.add_space(6.0);
+
+                        match app.where_tab {
+                            // ---- General categories (coarse log-source buckets) ----
+                            Some(0) => {
                                 ui.horizontal(|ui| {
                                     ui.label("Search:");
                                     ui.text_edit_singleline(&mut app.source_search);
@@ -163,20 +209,10 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                     }
                                     ui.checkbox(&mut app.source_selected[i], def.label);
                                 }
-                            });
+                            }
 
-                        ui.add_space(6.0);
-
-                        // ---- Granular Azure / M365 tables ----
-                        let table_sub_header = if table_count > 0 {
-                            format!("Azure / M365 log tables ({} selected)", table_count)
-                        } else {
-                            "Azure / M365 log tables".to_string()
-                        };
-                        egui::CollapsingHeader::new(table_sub_header)
-                            .id_salt("azure_tables_header")
-                            .default_open(app.azure_tables_open)
-                            .show(ui, |ui| {
+                            // ---- Granular Azure / M365 tables ----
+                            Some(1) => {
                                 ui.label(
                                     egui::RichText::new(
                                         "Pick the exact Log Analytics / Sentinel / Defender \
@@ -236,20 +272,10 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                         }
                                     }
                                 });
-                            });
+                            }
 
-                        ui.add_space(6.0);
-
-                        // ---- Granular Splunk sourcetypes ----
-                        let st_sub_header = if st_count > 0 {
-                            format!("Splunk sourcetypes ({} selected)", st_count)
-                        } else {
-                            "Splunk sourcetypes".to_string()
-                        };
-                        egui::CollapsingHeader::new(st_sub_header)
-                            .id_salt("splunk_sourcetypes_header")
-                            .default_open(app.sourcetypes_open)
-                            .show(ui, |ui| {
+                            // ---- Granular Splunk sourcetypes ----
+                            Some(2) => {
                                 ui.label(
                                     egui::RichText::new(
                                         "Pick the exact sourcetypes you ingest in Splunk.",
@@ -308,7 +334,10 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                         }
                                     }
                                 });
-                            });
+                            }
+
+                            _ => {}
+                        }
                     });
 
                 // ---------- APT targeting ----------
