@@ -124,6 +124,8 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
+                ui.heading("Filter");
+                ui.add_space(6.0);
                 let src_count = app.source_selected.iter().filter(|&&v| v).count();
                 let table_count = app.azure_table_selected.iter().filter(|&&v| v).count();
                 let st_count = app.sourcetype_selected.iter().filter(|&&v| v).count();
@@ -868,9 +870,9 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 if ui
                     .add(
                         egui::Button::new(
-                            egui::RichText::new("⬅ Back to Menu").color(egui::Color32::WHITE),
+                            egui::RichText::new("⬅ Menu").color(egui::Color32::WHITE),
                         )
-                        .fill(egui::Color32::from_rgb(255, 140, 0)),
+                        .fill(egui::Color32::from_rgb(140, 115, 95)), // muted gray-orange
                     )
                     .clicked()
                 {
