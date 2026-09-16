@@ -75,10 +75,11 @@ impl App for MainApp {
                             .add(
                                 egui::Button::new(
                                     egui::RichText::new("🛠 Rules")
-                                        .size(70.0)
+                                        .size(42.0)
                                         .color(Color32::WHITE),
                                 )
-                                .min_size(egui::vec2(500.0, 150.0))
+                                .min_size(egui::vec2(300.0, 90.0))
+                                .corner_radius(12)
                                 .fill(Color32::from_rgb(70, 130, 180)), // SteelBlue
                             )
                             .clicked()
@@ -91,10 +92,11 @@ impl App for MainApp {
                             .add(
                                 egui::Button::new(
                                     egui::RichText::new("📥 IOCs")
-                                        .size(70.0)
+                                        .size(42.0)
                                         .color(Color32::WHITE),
                                 )
-                                .min_size(egui::vec2(500.0, 150.0))
+                                .min_size(egui::vec2(300.0, 90.0))
+                                .corner_radius(12)
                                 .fill(Color32::from_rgb(60, 179, 113)), // MediumSeaGreen
                             )
                             .clicked()
