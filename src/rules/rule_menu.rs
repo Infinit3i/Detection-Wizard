@@ -49,6 +49,11 @@ pub struct ToolSelectorApp {
     /// 2=TTPs); only one at a time, None = all collapsed
     pub filter_tab: Option<usize>,
 
+    /// global search box next to the "Filter" heading: when non-empty,
+    /// shows matches from every category (General/Azure/Splunk/APT/TTPs)
+    /// labeled with which one they belong to, instead of the tabs
+    pub filter_search: String,
+
     // --- Targeting: MITRE ATT&CK techniques ---
     /// parallel to crate::ttp_catalog::TTP_CATALOG; all false = no TTP filter
     pub ttp_selected: Vec<bool>,
@@ -84,6 +89,7 @@ impl Default for ToolSelectorApp {
             sourcetype_search: String::new(),
             where_tab: None,
             filter_tab: None,
+            filter_search: String::new(),
             ttp_selected: vec![false; TTP_CATALOG.len()],
             ttp_search: String::new(),
             technique_input: String::new(),

@@ -129,7 +129,15 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
-                ui.heading("Filter");
+                ui.horizontal(|ui| {
+                    ui.heading("Filter");
+                    ui.add_space(12.0);
+                    ui.label("Search:");
+                    ui.text_edit_singleline(&mut app.filter_search);
+                    if !app.filter_search.is_empty() && ui.small_button("Clear").clicked() {
+                        app.filter_search.clear();
+                    }
+                });
                 ui.add_space(6.0);
                 let src_count = app.source_selected.iter().filter(|&&v| v).count();
                 let table_count = app.azure_table_selected.iter().filter(|&&v| v).count();
@@ -158,6 +166,135 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                     "TTPs".to_string()
                 };
 
+                let needle_global = app.filter_search.trim().to_lowercase();
+                if !needle_global.is_empty() {
+                    // ---------- Unified search across every filter category ----------
+                    egui::ScrollArea::vertical()
+                        .id_salt("filter_global_search_scroll")
+                        .max_height(420.0)
+                        .show(ui, |ui| {
+                            // General log-source categories
+                            let mut shown_any = false;
+                            let mut hits: Vec<usize> = Vec::new();
+                            for (i, def) in LOG_SOURCES.iter().enumerate() {
+                                if def.label.to_lowercase().contains(&needle_global)
+                                    || def.id.to_lowercase().contains(&needle_global)
+                                {
+                                    hits.push(i);
+                                }
+                            }
+                            if !hits.is_empty() {
+                                shown_any = true;
+                                ui.label(egui::RichText::new("General (Log Sources)").strong());
+                                for i in hits {
+                                    ui.checkbox(
+                                        &mut app.source_selected[i],
+                                        LOG_SOURCES[i].label,
+                                    );
+                                }
+                                ui.add_space(8.0);
+                            }
+
+                            // Azure / M365 log tables
+                            let mut hits: Vec<usize> = Vec::new();
+                            for (i, def) in AZURE_TABLES.iter().enumerate() {
+                                if def.name.to_lowercase().contains(&needle_global)
+                                    || def.category.to_lowercase().contains(&needle_global)
+                                {
+                                    hits.push(i);
+                                }
+                            }
+                            if !hits.is_empty() {
+                                shown_any = true;
+                                ui.label(egui::RichText::new("Azure / M365 tables (Log Sources)").strong());
+                                for i in hits {
+                                    ui.checkbox(
+                                        &mut app.azure_table_selected[i],
+                                        AZURE_TABLES[i].name,
+                                    );
+                                }
+                                ui.add_space(8.0);
+                            }
+
+                            // Splunk sourcetypes
+                            let mut hits: Vec<usize> = Vec::new();
+                            for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
+                                if def.name.to_lowercase().contains(&needle_global)
+                                    || def.category.to_lowercase().contains(&needle_global)
+                                {
+                                    hits.push(i);
+                                }
+                            }
+                            if !hits.is_empty() {
+                                shown_any = true;
+                                ui.label(egui::RichText::new("Splunk sourcetypes (Log Sources)").strong());
+                                for i in hits {
+                                    ui.checkbox(
+                                        &mut app.sourcetype_selected[i],
+                                        SPLUNK_SOURCETYPES[i].name,
+                                    );
+                                }
+                                ui.add_space(8.0);
+                            }
+
+                            // APT groups
+                            let mut hits: Vec<usize> = Vec::new();
+                            for (i, g) in APT_GROUPS.iter().enumerate() {
+                                if g.matches_search(&needle_global) {
+                                    hits.push(i);
+                                }
+                            }
+                            if !hits.is_empty() {
+                                shown_any = true;
+                                ui.label(egui::RichText::new("APT").strong());
+                                for i in hits {
+                                    let g = &APT_GROUPS[i];
+                                    let label = if g.origin.is_empty() {
+                                        format!("{} ({})", g.name, g.mitre_id)
+                                    } else {
+                                        format!("{} ({}) — {}", g.name, g.mitre_id, g.origin)
+                                    };
+                                    ui.checkbox(&mut app.apt_selected[i], label)
+                                        .on_hover_text(format!(
+                                            "Aliases: {}\nSoftware: {}",
+                                            g.aliases.join(", "),
+                                            g.software.join(", ")
+                                        ));
+                                }
+                                ui.add_space(8.0);
+                            }
+
+                            // TTPs
+                            let mut hits: Vec<usize> = Vec::new();
+                            for (i, def) in TTP_CATALOG.iter().enumerate() {
+                                if def.id.to_lowercase().contains(&needle_global)
+                                    || def.name.to_lowercase().contains(&needle_global)
+                                    || def.tactic.to_lowercase().contains(&needle_global)
+                                {
+                                    hits.push(i);
+                                }
+                            }
+                            if !hits.is_empty() {
+                                shown_any = true;
+                                ui.label(egui::RichText::new("TTPs").strong());
+                                for i in hits {
+                                    let def = &TTP_CATALOG[i];
+                                    let indent = if def.id.contains('.') { "    " } else { "" };
+                                    ui.checkbox(
+                                        &mut app.ttp_selected[i],
+                                        format!("{}{} — {}", indent, def.id, def.name),
+                                    );
+                                }
+                            }
+
+                            if !shown_any {
+                                ui.label(
+                                    egui::RichText::new("No matches in any category.")
+                                        .color(egui::Color32::GRAY),
+                                );
+                            }
+                        });
+                } else {
                 // Top-level tab row: clicking a tab opens its full-width body below
                 // and closes the others; clicking the open tab collapses it.
                 ui.horizontal(|ui| {
@@ -510,6 +647,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                     }
 
                     _ => {}
+                }
                 }
 
                 ui.add_space(10.0);
