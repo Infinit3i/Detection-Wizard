@@ -520,7 +520,14 @@ fn condition_kql(condition: &ConditionExpr, blocks: &[SelectionBlock]) -> String
 /// as they appear in Defender/Sentinel tables. Fields not in this map pass
 /// through unchanged (most already match, e.g. CommandLine, ProcessId).
 /// See the module doc-comment for the "not schema-derived" caveat.
-const FIELD_MAP: &[(&str, &str)] = &[];
+const FIELD_MAP: &[(&str, &str)] = &[
+    ("Image", "FolderPath"),
+    ("ParentImage", "InitiatingProcessFolderPath"),
+    ("TargetFilename", "FolderPath"),
+    ("DestinationIp", "RemoteIP"),
+    ("DestinationPort", "RemotePort"),
+    ("User", "AccountName"),
+];
 
 fn map_field(sigma_field: &str) -> &str {
     FIELD_MAP
@@ -569,7 +576,7 @@ detection:
         let d = parse_sigma_rule(SIGMA_SIMPLE).unwrap();
         let kql = to_kql(&d);
         assert!(kql.contains("DeviceProcessEvents"));
-        assert!(kql.contains(r#"Image endswith @"\powershell.exe""#));
+        assert!(kql.contains(r#"FolderPath endswith @"\powershell.exe""#));
         assert!(kql.contains(r#"CommandLine contains @"-EncodedCommand""#));
         assert!(kql.contains(" and "));
     }
@@ -591,8 +598,8 @@ detection:
     fn multi_value_field_emits_or() {
         let d = parse_sigma_rule(SIGMA_MULTI_VALUE).unwrap();
         let kql = to_kql(&d);
-        assert!(kql.contains(r#"Image endswith @"\certutil.exe""#));
-        assert!(kql.contains(r#"Image endswith @"\bitsadmin.exe""#));
+        assert!(kql.contains(r#"FolderPath endswith @"\certutil.exe""#));
+        assert!(kql.contains(r#"FolderPath endswith @"\bitsadmin.exe""#));
         assert!(kql.contains(" or "));
     }
 
@@ -620,7 +627,7 @@ detection:
             ])
         );
         let kql = to_kql(&d);
-        assert!(kql.contains(r#"Image endswith @"\powershell.exe""#));
+        assert!(kql.contains(r#"FolderPath endswith @"\powershell.exe""#));
         assert!(kql.contains(r#"CommandLine contains @"-enc""#));
         assert!(kql.contains(" and "));
     }
@@ -643,8 +650,8 @@ detection:
         let d = parse_sigma_rule(SIGMA_ONE_OF).unwrap();
         assert_eq!(d.condition, ConditionExpr::OneOf("selection*".into()));
         let kql = to_kql(&d);
-        assert!(kql.contains(r#"Image endswith @"\certutil.exe""#));
-        assert!(kql.contains(r#"Image endswith @"\bitsadmin.exe""#));
+        assert!(kql.contains(r#"FolderPath endswith @"\certutil.exe""#));
+        assert!(kql.contains(r#"FolderPath endswith @"\bitsadmin.exe""#));
         assert!(kql.contains(" or "));
     }
 
@@ -666,7 +673,7 @@ detection:
         let d = parse_sigma_rule(SIGMA_ALL_OF_THEM).unwrap();
         assert_eq!(d.condition, ConditionExpr::AllOf("them".into()));
         let kql = to_kql(&d);
-        assert!(kql.contains(r#"Image endswith @"\certutil.exe""#));
+        assert!(kql.contains(r#"FolderPath endswith @"\certutil.exe""#));
         assert!(kql.contains(r#"CommandLine contains @"-urlcache""#));
         assert!(kql.contains(" and "));
     }
@@ -721,5 +728,28 @@ detection:
     fn unsupported_modifier_is_rejected() {
         let result = parse_sigma_rule(SIGMA_UNSUPPORTED_MODIFIER);
         assert!(result.is_err());
+    }
+
+    const SIGMA_MAPPED_FIELD: &str = r#"
+title: Mapped field name
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection:
+        Image|endswith: '\mimikatz.exe'
+        CommandLine|contains: 'sekurlsa'
+    condition: selection
+"#;
+
+    #[test]
+    fn mapped_field_uses_kql_column_name() {
+        let d = parse_sigma_rule(SIGMA_MAPPED_FIELD).unwrap();
+        let kql = to_kql(&d);
+        // Image is mapped to FolderPath for Defender XDR tables.
+        assert!(kql.contains(r#"FolderPath endswith @"\mimikatz.exe""#));
+        assert!(!kql.contains("Image endswith"));
+        // CommandLine has no mapping entry -> passes through unchanged.
+        assert!(kql.contains(r#"CommandLine contains @"sekurlsa""#));
     }
 }
