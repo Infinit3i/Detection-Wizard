@@ -363,6 +363,9 @@ pub fn parse_sigma_rule(yaml: &str) -> Result<SigmaDetection, String> {
                 return Err(format!("expected 'field: value', got: {field_trimmed}"));
             }
         }
+        if fields.is_empty() {
+            return Err(format!("empty selection block: {block_name}"));
+        }
         blocks.push(SelectionBlock {
             name: block_name.to_string(),
             fields,
@@ -378,6 +381,8 @@ pub fn parse_sigma_rule(yaml: &str) -> Result<SigmaDetection, String> {
         return Err("no selection blocks found in detection:".to_string());
     }
 
+    validate_condition_refs(&condition, &blocks)?;
+
     Ok(SigmaDetection {
         title,
         table,
@@ -386,9 +391,153 @@ pub fn parse_sigma_rule(yaml: &str) -> Result<SigmaDetection, String> {
     })
 }
 
+/// Resolve a `1 of X` / `all of X` pattern (`X` = a literal block name,
+/// `them`, or a `prefix*` wildcard) to the blocks it refers to.
+fn resolve_pattern_blocks<'a>(
+    pattern: &str,
+    blocks: &'a [SelectionBlock],
+) -> Vec<&'a SelectionBlock> {
+    if pattern == "them" {
+        blocks.iter().collect()
+    } else if let Some(prefix) = pattern.strip_suffix('*') {
+        blocks
+            .iter()
+            .filter(|b| b.name.starts_with(prefix))
+            .collect()
+    } else {
+        blocks.iter().filter(|b| b.name == pattern).collect()
+    }
+}
+
+/// Verify every `Block`/`OneOf`/`AllOf` reference in `condition` resolves to
+/// at least one real selection block, so `to_kql` never has to guess.
+fn validate_condition_refs(
+    condition: &ConditionExpr,
+    blocks: &[SelectionBlock],
+) -> Result<(), String> {
+    match condition {
+        ConditionExpr::Block(name) => {
+            if !blocks.iter().any(|b| &b.name == name) {
+                return Err(format!("condition references unknown block: {name}"));
+            }
+        }
+        ConditionExpr::Not(inner) => validate_condition_refs(inner, blocks)?,
+        ConditionExpr::And(list) | ConditionExpr::Or(list) => {
+            for e in list {
+                validate_condition_refs(e, blocks)?;
+            }
+        }
+        ConditionExpr::OneOf(pattern) | ConditionExpr::AllOf(pattern) => {
+            if resolve_pattern_blocks(pattern, blocks).is_empty() {
+                return Err(format!("'of {pattern}' matches no selection blocks"));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Render one Sigma value as a KQL verbatim string literal.
+fn kql_literal(value: &str) -> String {
+    format!("@\"{}\"", value.replace('"', "\"\""))
+}
+
+/// Render one `FieldMatch` as a KQL boolean predicate. Multiple values under
+/// one field are Sigma's implicit OR, so they're joined with `or`.
+fn field_match_kql(fm: &FieldMatch) -> String {
+    let field = map_field(&fm.field);
+    let atoms: Vec<String> = fm
+        .values
+        .iter()
+        .map(|v| match fm.modifier {
+            Modifier::Equals => format!("{field} =~ {}", kql_literal(v)),
+            Modifier::Contains => format!("{field} contains {}", kql_literal(v)),
+            Modifier::StartsWith => format!("{field} startswith {}", kql_literal(v)),
+            Modifier::EndsWith => format!("{field} endswith {}", kql_literal(v)),
+            Modifier::Regex => format!("{field} matches regex {}", kql_literal(v)),
+        })
+        .collect();
+    if atoms.len() == 1 {
+        atoms.into_iter().next().unwrap()
+    } else {
+        format!("({})", atoms.join(" or "))
+    }
+}
+
+/// Render one `SelectionBlock` (all its fields AND'd together) as KQL.
+fn block_kql(block: &SelectionBlock) -> String {
+    let atoms: Vec<String> = block.fields.iter().map(field_match_kql).collect();
+    if atoms.len() == 1 {
+        atoms.into_iter().next().unwrap()
+    } else {
+        format!("({})", atoms.join(" and "))
+    }
+}
+
+/// Render a `ConditionExpr` as a KQL boolean expression. Assumes
+/// `validate_condition_refs` already confirmed every reference resolves.
+fn condition_kql(condition: &ConditionExpr, blocks: &[SelectionBlock]) -> String {
+    match condition {
+        ConditionExpr::Block(name) => {
+            let block = blocks
+                .iter()
+                .find(|b| &b.name == name)
+                .expect("validate_condition_refs guarantees this block exists");
+            block_kql(block)
+        }
+        ConditionExpr::Not(inner) => format!("not ({})", condition_kql(inner, blocks)),
+        ConditionExpr::And(list) => list
+            .iter()
+            .map(|e| format!("({})", condition_kql(e, blocks)))
+            .collect::<Vec<_>>()
+            .join(" and "),
+        ConditionExpr::Or(list) => list
+            .iter()
+            .map(|e| format!("({})", condition_kql(e, blocks)))
+            .collect::<Vec<_>>()
+            .join(" or "),
+        ConditionExpr::OneOf(pattern) => {
+            let matched = resolve_pattern_blocks(pattern, blocks);
+            let atoms: Vec<String> = matched.iter().map(|b| block_kql(b)).collect();
+            if atoms.len() == 1 {
+                atoms.into_iter().next().unwrap()
+            } else {
+                format!("({})", atoms.join(" or "))
+            }
+        }
+        ConditionExpr::AllOf(pattern) => {
+            let matched = resolve_pattern_blocks(pattern, blocks);
+            let atoms: Vec<String> = matched.iter().map(|b| block_kql(b)).collect();
+            if atoms.len() == 1 {
+                atoms.into_iter().next().unwrap()
+            } else {
+                format!("({})", atoms.join(" and "))
+            }
+        }
+    }
+}
+
+/// Sigma field name -> KQL column name, for the common Sysmon-style fields
+/// as they appear in Defender/Sentinel tables. Fields not in this map pass
+/// through unchanged (most already match, e.g. CommandLine, ProcessId).
+/// See the module doc-comment for the "not schema-derived" caveat.
+const FIELD_MAP: &[(&str, &str)] = &[];
+
+fn map_field(sigma_field: &str) -> &str {
+    FIELD_MAP
+        .iter()
+        .find(|(k, _)| *k == sigma_field)
+        .map(|(_, v)| *v)
+        .unwrap_or(sigma_field)
+}
+
 /// Emit a KQL query string from a parsed `SigmaDetection`.
-pub fn to_kql(_detection: &SigmaDetection) -> String {
-    unimplemented!("step 3")
+pub fn to_kql(detection: &SigmaDetection) -> String {
+    format!(
+        "// {}\n{}\n| where {}\n",
+        detection.title,
+        detection.table,
+        condition_kql(&detection.condition, &detection.blocks)
+    )
 }
 
 #[cfg(test)]
@@ -413,5 +562,164 @@ detection:
         assert_eq!(d.blocks.len(), 1);
         assert_eq!(d.blocks[0].fields.len(), 2);
         assert_eq!(d.condition, ConditionExpr::Block("selection".into()));
+    }
+
+    #[test]
+    fn simple_and_block_emits_expected_kql() {
+        let d = parse_sigma_rule(SIGMA_SIMPLE).unwrap();
+        let kql = to_kql(&d);
+        assert!(kql.contains("DeviceProcessEvents"));
+        assert!(kql.contains(r#"Image endswith @"\powershell.exe""#));
+        assert!(kql.contains(r#"CommandLine contains @"-EncodedCommand""#));
+        assert!(kql.contains(" and "));
+    }
+
+    const SIGMA_MULTI_VALUE: &str = r#"
+title: Suspicious LOLBin
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection:
+        Image|endswith:
+            - '\certutil.exe'
+            - '\bitsadmin.exe'
+    condition: selection
+"#;
+
+    #[test]
+    fn multi_value_field_emits_or() {
+        let d = parse_sigma_rule(SIGMA_MULTI_VALUE).unwrap();
+        let kql = to_kql(&d);
+        assert!(kql.contains(r#"Image endswith @"\certutil.exe""#));
+        assert!(kql.contains(r#"Image endswith @"\bitsadmin.exe""#));
+        assert!(kql.contains(" or "));
+    }
+
+    const SIGMA_TWO_BLOCKS_AND: &str = r#"
+title: Two blocks ANDed
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection1:
+        Image|endswith: '\powershell.exe'
+    selection2:
+        CommandLine|contains: '-enc'
+    condition: selection1 and selection2
+"#;
+
+    #[test]
+    fn multiple_blocks_anded_via_condition() {
+        let d = parse_sigma_rule(SIGMA_TWO_BLOCKS_AND).unwrap();
+        assert_eq!(
+            d.condition,
+            ConditionExpr::And(vec![
+                ConditionExpr::Block("selection1".into()),
+                ConditionExpr::Block("selection2".into()),
+            ])
+        );
+        let kql = to_kql(&d);
+        assert!(kql.contains(r#"Image endswith @"\powershell.exe""#));
+        assert!(kql.contains(r#"CommandLine contains @"-enc""#));
+        assert!(kql.contains(" and "));
+    }
+
+    const SIGMA_ONE_OF: &str = r#"
+title: One of selection*
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection_a:
+        Image|endswith: '\certutil.exe'
+    selection_b:
+        Image|endswith: '\bitsadmin.exe'
+    condition: 1 of selection*
+"#;
+
+    #[test]
+    fn one_of_wildcard_ors_matching_blocks() {
+        let d = parse_sigma_rule(SIGMA_ONE_OF).unwrap();
+        assert_eq!(d.condition, ConditionExpr::OneOf("selection*".into()));
+        let kql = to_kql(&d);
+        assert!(kql.contains(r#"Image endswith @"\certutil.exe""#));
+        assert!(kql.contains(r#"Image endswith @"\bitsadmin.exe""#));
+        assert!(kql.contains(" or "));
+    }
+
+    const SIGMA_ALL_OF_THEM: &str = r#"
+title: All of them
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection_a:
+        Image|endswith: '\certutil.exe'
+    selection_b:
+        CommandLine|contains: '-urlcache'
+    condition: all of them
+"#;
+
+    #[test]
+    fn all_of_them_ands_every_block() {
+        let d = parse_sigma_rule(SIGMA_ALL_OF_THEM).unwrap();
+        assert_eq!(d.condition, ConditionExpr::AllOf("them".into()));
+        let kql = to_kql(&d);
+        assert!(kql.contains(r#"Image endswith @"\certutil.exe""#));
+        assert!(kql.contains(r#"CommandLine contains @"-urlcache""#));
+        assert!(kql.contains(" and "));
+    }
+
+    const SIGMA_REGEX: &str = r#"
+title: Regex modifier
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection:
+        CommandLine|re: 'powershell\s+-enc\w*'
+    condition: selection
+"#;
+
+    #[test]
+    fn regex_modifier_emits_matches_regex() {
+        let d = parse_sigma_rule(SIGMA_REGEX).unwrap();
+        let kql = to_kql(&d);
+        assert!(kql.contains(r#"CommandLine matches regex @"powershell\s+-enc\w*""#));
+    }
+
+    const SIGMA_AGGREGATION: &str = r#"
+title: Aggregation condition (unsupported)
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection:
+        Image|endswith: '\net.exe'
+    condition: selection | count() > 5
+"#;
+
+    #[test]
+    fn aggregation_condition_is_rejected() {
+        let result = parse_sigma_rule(SIGMA_AGGREGATION);
+        assert!(result.is_err());
+    }
+
+    const SIGMA_UNSUPPORTED_MODIFIER: &str = r#"
+title: Unsupported modifier (unsupported)
+logsource:
+    product: windows
+    category: process_creation
+detection:
+    selection:
+        Data|base64: 'ZXZpbA=='
+    condition: selection
+"#;
+
+    #[test]
+    fn unsupported_modifier_is_rejected() {
+        let result = parse_sigma_rule(SIGMA_UNSUPPORTED_MODIFIER);
+        assert!(result.is_err());
     }
 }
