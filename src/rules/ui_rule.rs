@@ -127,7 +127,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 let where_header = if where_total > 0 {
                     format!("Log Sources ({} selected)", where_total)
                 } else {
-                    "Log Sources (all included)".to_string()
+                    "Log Sources".to_string()
                 };
                 egui::CollapsingHeader::new(where_header)
                     .id_salt("where_header")
@@ -137,7 +137,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         let src_sub_header = if src_count > 0 {
                             format!("General categories ({} selected)", src_count)
                         } else {
-                            "General categories (all included)".to_string()
+                            "General categories".to_string()
                         };
                         egui::CollapsingHeader::new(src_sub_header)
                             .id_salt("log_sources_header")
@@ -171,7 +171,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         let table_sub_header = if table_count > 0 {
                             format!("Azure / M365 log tables ({} selected)", table_count)
                         } else {
-                            "Azure / M365 log tables (all included)".to_string()
+                            "Azure / M365 log tables".to_string()
                         };
                         egui::CollapsingHeader::new(table_sub_header)
                             .id_salt("azure_tables_header")
@@ -244,7 +244,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         let st_sub_header = if st_count > 0 {
                             format!("Splunk sourcetypes ({} selected)", st_count)
                         } else {
-                            "Splunk sourcetypes (all included)".to_string()
+                            "Splunk sourcetypes".to_string()
                         };
                         egui::CollapsingHeader::new(st_sub_header)
                             .id_salt("splunk_sourcetypes_header")
@@ -319,7 +319,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 let apt_header = if apt_count > 0 {
                     format!("Threat actors / APT groups ({} selected)", apt_count)
                 } else {
-                    "Threat actors / APT groups (all included)".to_string()
+                    "Threat actors / APT groups".to_string()
                 };
                 egui::CollapsingHeader::new(apt_header)
                     .id_salt("apt_header")
@@ -388,7 +388,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         if extra_codes { " + custom" } else { "" }
                     )
                 } else {
-                    "MITRE ATT&CK techniques (all included)".to_string()
+                    "MITRE ATT&CK techniques".to_string()
                 };
                 egui::CollapsingHeader::new(ttp_header)
                     .id_salt("ttp_header")
