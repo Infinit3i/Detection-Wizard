@@ -1,5 +1,6 @@
 use super::ioc_menu::{IOCSelectorApp, OutputFormat};
-use crate::download::render_nav_buttons;
+use crate::download::NavAction;
+use crate::download::render_nav_panel;
 use crate::download::render_output_path_selector;
 use crate::download::{DownloadFormat, start_download};
 use eframe::egui;
@@ -13,6 +14,7 @@ use std::sync::Arc;
 use walkdir::WalkDir;
 
 pub fn render_ui_ioc(app: &mut IOCSelectorApp, ctx: &egui::Context, back_to_menu: impl FnMut()) {
+    render_nav_panel(ctx, NavAction::Menu(back_to_menu));
     egui::CentralPanel::default()
         .frame(
             egui::Frame::default()
@@ -241,9 +243,7 @@ pub fn render_ui_ioc(app: &mut IOCSelectorApp, ctx: &egui::Context, back_to_menu
             }
 
             ui.add_space(30.0);
-            ui.separator();
             ui.add_space(40.0);
-            render_nav_buttons(ui, Some(back_to_menu));
         });
 }
 

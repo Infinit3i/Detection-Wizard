@@ -2,7 +2,8 @@ use super::rule_menu::ToolSelectorApp;
 use super::{qradar, sentinel, sigma, splunk, suricata, sysmon, yara};
 use crate::apt_catalog::{APT_GROUPS, expand_terms};
 use crate::azure_tables::AZURE_TABLES;
-use crate::download::render_nav_buttons;
+use crate::download::NavAction;
+use crate::download::render_nav_panel;
 use crate::download::render_output_path_selector;
 use crate::filter::{CompiledFilter, LOG_SOURCES};
 use crate::splunk_sourcetypes::SPLUNK_SOURCETYPES;
@@ -15,6 +16,7 @@ use std::sync::atomic::Ordering;
 pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: impl FnMut()) {
     // Hover text (e.g. on shortened filter labels) waits 2s before showing.
     ctx.style_mut(|style| style.interaction.tooltip_delay = 2.0);
+    render_nav_panel(ctx, NavAction::Menu(back_to_menu));
     egui::CentralPanel::default()
         .frame(
             egui::Frame::default()
@@ -886,9 +888,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                 }
 
                 ui.add_space(30.0);
-                ui.separator();
                 ui.add_space(40.0);
-                render_nav_buttons(ui, Some(back_to_menu));
             });
         });
 }

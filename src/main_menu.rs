@@ -1,4 +1,4 @@
-use crate::download::render_nav_buttons;
+use crate::download::{NavAction, render_nav_panel};
 use crate::ioc::ioc_menu::IOCSelectorApp;
 use crate::ioc::ui_ioc;
 use crate::rules::rule_menu::ToolSelectorApp;
@@ -60,6 +60,8 @@ impl App for MainApp {
             }
 
             Screen::Menu => {
+                // Same bottom-left nav panel every other screen uses.
+                render_nav_panel::<fn()>(ctx, NavAction::Quit);
                 egui::CentralPanel::default()
                     .frame(
                         egui::Frame::default()
@@ -106,11 +108,6 @@ impl App for MainApp {
                                     new_screen = Some(Screen::IOCDownloader(Default::default()));
                                 }
                             });
-                        });
-
-                        // Bottom-left nav row, same placement/color as every other screen.
-                        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                            render_nav_buttons(ui, None::<fn()>);
                         });
                     });
             }

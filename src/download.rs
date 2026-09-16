@@ -160,38 +160,41 @@ pub fn render_output_path_selector(
     }
 }
 
-/// Shared nav-button color for every screen's "go back / quit" row, so the
-/// Rules, IOCs, and main menu screens can never drift out of sync.
+/// Shared nav-button color for every screen's bottom-left back/quit button,
+/// so the main menu, Rules, and IOCs screens can never drift out of sync.
 pub const NAV_BUTTON_COLOR: Color32 = Color32::from_rgb(140, 115, 95); // muted gray-orange
 
-/// Bottom-left "⬅ Menu" + "❌ Quit" button row, shared by every screen that
-/// has a back-to-menu action (the main menu itself only shows Quit).
-/// `on_back` is called when Menu is clicked; pass `None` to omit that button
-/// (e.g. on the main menu, which has nowhere further back to go).
-pub fn render_nav_buttons(ui: &mut egui::Ui, mut on_back: Option<impl FnMut()>) {
-    ui.horizontal(|ui| {
-        if let Some(on_back) = on_back.as_mut() {
+/// Single bottom-left nav button, pinned to the exact same screen position
+/// on every screen via a bottom `TopBottomPanel`: the main menu shows
+/// "❌ Quit" (nowhere further back to go), every other screen shows
+/// "⬅ Menu" and calls `on_back` when clicked. Exactly one button renders —
+/// never both — so screens can't accidentally show Quit anywhere but the
+/// main menu. Call this BEFORE the screen's CentralPanel::show so the
+/// bottom panel reserves its space consistently.
+pub enum NavAction<F: FnMut()> {
+    Menu(F),
+    Quit,
+}
+
+pub fn render_nav_panel<F: FnMut()>(ctx: &egui::Context, action: NavAction<F>) {
+    let (label, mut on_click): (&str, Box<dyn FnMut() + '_>) = match action {
+        NavAction::Menu(mut on_back) => ("⬅ Menu", Box::new(move || on_back())),
+        NavAction::Quit => ("❌ Quit", Box::new(|| std::process::exit(0))),
+    };
+    egui::TopBottomPanel::bottom("nav_panel")
+        .frame(egui::Frame::default().inner_margin(egui::Margin::symmetric(20, 15)))
+        .show_separator_line(false)
+        .show(ctx, |ui| {
             if ui
                 .add(
-                    egui::Button::new(egui::RichText::new("⬅ Menu").color(Color32::WHITE))
+                    egui::Button::new(egui::RichText::new(label).color(Color32::WHITE))
                         .fill(NAV_BUTTON_COLOR),
                 )
                 .clicked()
             {
-                on_back();
+                on_click();
             }
-        }
-
-        if ui
-            .add(
-                egui::Button::new(egui::RichText::new("❌ Quit").color(Color32::WHITE))
-                    .fill(NAV_BUTTON_COLOR),
-            )
-            .clicked()
-        {
-            std::process::exit(0);
-        }
-    });
+        });
 }
 
 /// Clone repo to a temp dir and copy only files with allowed extensions into dest_dir
