@@ -698,7 +698,7 @@ impl CompiledFilter {
                 }
             }
             "Suricata" => self.filter_suricata(content),
-            "Splunk" | "QRadar" => self.filter_text_rules(content),
+            "Splunk" | "QRadar" | "Sentinel" => self.filter_text_rules(content),
             "Sysmon" => {
                 // Sysmon configs are Windows collection configs, not APT detections:
                 // only the source filter applies (APT filter would drop all of them).
@@ -1072,6 +1072,29 @@ mod tests {
         // sibling sourcetype must not match (boundary check)
         assert!(matches!(
             f.filter_file("Splunk", "sourcetype=pan:threat"),
+            FilterOutcome::Drop
+        ));
+    }
+
+    #[test]
+    fn sentinel_routes_through_text_rules_like_splunk() {
+        let f = CompiledFilter::build_with_tables(vec![], vec![], vec!["SigninLogs".into()]);
+        // KQL referencing a selected table
+        assert!(matches!(
+            f.filter_file("Sentinel", "SigninLogs | where ResultType != 0"),
+            FilterOutcome::Keep
+        ));
+        // references an unselected table only
+        assert!(matches!(
+            f.filter_file(
+                "Sentinel",
+                "DeviceProcessEvents | where FileName == \"mimikatz.exe\""
+            ),
+            FilterOutcome::Drop
+        ));
+        // no table reference at all -> strict drop
+        assert!(matches!(
+            f.filter_file("Sentinel", "print now()"),
             FilterOutcome::Drop
         ));
     }
