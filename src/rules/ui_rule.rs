@@ -202,19 +202,19 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     // ---- Log Sources: General categories / Azure tables / Splunk sourcetypes ----
                     Some(0) => {
                         let src_sub_label = if src_count > 0 {
-                            format!("General categories ({})", src_count)
+                            format!("General ({})", src_count)
                         } else {
-                            "General categories".to_string()
+                            "General".to_string()
                         };
                         let table_sub_label = if table_count > 0 {
-                            format!("Azure / M365 log tables ({})", table_count)
+                            format!("Azure ({})", table_count)
                         } else {
-                            "Azure / M365 log tables".to_string()
+                            "Azure".to_string()
                         };
                         let st_sub_label = if st_count > 0 {
-                            format!("Splunk sourcetypes ({})", st_count)
+                            format!("Splunk ({})", st_count)
                         } else {
-                            "Splunk sourcetypes".to_string()
+                            "Splunk".to_string()
                         };
 
                         // Sub-tab row: clicking a tab opens it and closes the others;
@@ -222,6 +222,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         ui.horizontal(|ui| {
                             if ui
                                 .selectable_label(app.where_tab == Some(0), src_sub_label)
+                                .on_hover_text("General categories")
                                 .clicked()
                             {
                                 app.where_tab = if app.where_tab == Some(0) {
@@ -232,6 +233,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             }
                             if ui
                                 .selectable_label(app.where_tab == Some(1), table_sub_label)
+                                .on_hover_text("Azure / M365 log tables")
                                 .clicked()
                             {
                                 app.where_tab = if app.where_tab == Some(1) {
@@ -242,6 +244,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             }
                             if ui
                                 .selectable_label(app.where_tab == Some(2), st_sub_label)
+                                .on_hover_text("Splunk sourcetypes")
                                 .clicked()
                             {
                                 app.where_tab = if app.where_tab == Some(2) {
