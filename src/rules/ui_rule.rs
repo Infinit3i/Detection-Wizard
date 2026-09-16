@@ -83,38 +83,42 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.heading("Select Rules:");
 
-                for (i, name) in app.tool_names.iter().enumerate() {
-                    let checkbox = ui.checkbox(&mut app.selected[i], *name);
+                ui.horizontal_wrapped(|ui| {
+                    for (i, name) in app.tool_names.iter().enumerate() {
+                        let checkbox = ui.checkbox(&mut app.selected[i], *name);
 
-                    if checkbox.clicked() {
-                        if *name == "All" && app.selected[i] {
-                            // Turn ON all
-                            for j in 0..app.tool_names.len() {
-                                app.selected[j] = true;
-                            }
-                        } else if *name == "All" && !app.selected[i] {
-                            // Turn OFF all
-                            for j in 0..app.tool_names.len() {
-                                app.selected[j] = false;
-                            }
-                        } else {
-                            // If any individual is toggled off, uncheck All
-                            let all_index = app.tool_names.iter().position(|&x| x == "All");
-                            if let Some(idx) = all_index {
-                                app.selected[idx] = false;
-                            }
+                        if checkbox.clicked() {
+                            if *name == "All" && app.selected[i] {
+                                // Turn ON all
+                                for j in 0..app.tool_names.len() {
+                                    app.selected[j] = true;
+                                }
+                            } else if *name == "All" && !app.selected[i] {
+                                // Turn OFF all
+                                for j in 0..app.tool_names.len() {
+                                    app.selected[j] = false;
+                                }
+                            } else {
+                                // If any individual is toggled off, uncheck All
+                                let all_index = app.tool_names.iter().position(|&x| x == "All");
+                                if let Some(idx) = all_index {
+                                    app.selected[idx] = false;
+                                }
 
-                            // If all individuals are now selected, check All
-                            let all_selected =
-                                app.selected[..app.tool_names.len() - 1].iter().all(|&v| v);
-                            if all_selected {
-                                if let Some(idx) = app.tool_names.iter().position(|&x| x == "All") {
-                                    app.selected[idx] = true;
+                                // If all individuals are now selected, check All
+                                let all_selected =
+                                    app.selected[..app.tool_names.len() - 1].iter().all(|&v| v);
+                                if all_selected {
+                                    if let Some(idx) =
+                                        app.tool_names.iter().position(|&x| x == "All")
+                                    {
+                                        app.selected[idx] = true;
+                                    }
                                 }
                             }
                         }
                     }
-                }
+                });
 
                 // ---------- Log sources / tables / sourcetypes (one combined dropdown) ----------
                 ui.add_space(10.0);
