@@ -1,4 +1,4 @@
-use super::rule_menu::{OutputMode, ToolSelectorApp};
+use super::rule_menu::{TargetLanguage, ToolSelectorApp};
 use super::{qradar, sentinel, sigma, splunk, suricata, sysmon, yara};
 use crate::apt_catalog::{APT_GROUPS, expand_terms};
 use crate::azure_tables::AZURE_TABLES;
@@ -597,13 +597,30 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                 ui.separator();
                 ui.add_space(10.0);
                 ui.horizontal(|ui| {
-                    ui.label("Output as:");
-                    ui.radio_value(&mut app.output_mode, OutputMode::Native, "Native (per-tool)");
-                    ui.radio_value(&mut app.output_mode, OutputMode::Sentinel, "Sentinel (KQL)")
+                    ui.label("Convert all output to:");
+                    let current_label = match app.output_mode {
+                        None => "No conversion (native per-tool)",
+                        Some(lang) => lang.label(),
+                    };
+                    egui::ComboBox::from_id_salt("target_language_combo")
+                        .selected_text(current_label)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut app.output_mode,
+                                None,
+                                "No conversion (native per-tool)",
+                            );
+                            for lang in TargetLanguage::ALL {
+                                ui.selectable_value(&mut app.output_mode, Some(lang), lang.label());
+                            }
+                        })
+                        .response
                         .on_hover_text(
-                            "Convert selected Sigma rules to real KQL analytics-rule \
-                             queries and merge them into the sentinel/ output folder. \
-                             Only Sigma is converted; other tools are unaffected.",
+                            "Convert every selected tool's rules that can be parsed into the \
+                             shared rule model to this one language. Rules that can't be \
+                             confidently converted (aggregations, correlation rules, exotic \
+                             modifiers) stay in their original format rather than risk a wrong \
+                             translation.",
                         );
                 });
                 ui.add_space(10.0);

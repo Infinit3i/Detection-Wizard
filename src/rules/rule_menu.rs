@@ -7,22 +7,36 @@ use eframe::{App, Frame, egui};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
-/// How selected tools' rules are written to the output folder.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum OutputMode {
-    /// Every tool's rules are written in their native format (current
-    /// behavior): Sigma stays YAML in sigma/, Sentinel stays KQL in
-    /// sentinel/, etc.
-    #[default]
-    Native,
-    /// Convertible Sigma rules are translated to real KQL analytics-rule
-    /// queries and merged into the sentinel/ folder alongside native
-    /// Sentinel rules. Sigma rules that can't be confidently converted stay
-    /// in sigma/ as YAML, same as Native mode. Other tools (Yara, Suricata,
-    /// Splunk, QRadar, Sysmon) are unaffected -- they use different rule
-    /// languages entirely and aren't Sigma-derived, so there's nothing to
-    /// convert.
+/// The single rule language all selected tools' output is converted into.
+/// `None` means "no conversion" (current/native behavior: every tool keeps
+/// its own format in its own subfolder). `Some(lang)` means every rule that
+/// can be parsed into the shared `RuleAst` gets re-emitted as `lang`;
+/// anything that can't be confidently converted stays in its original
+/// format and folder rather than risk a wrong translation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetLanguage {
+    Sigma,
+    Splunk,
+    QRadar,
     Sentinel,
+}
+
+impl TargetLanguage {
+    pub const ALL: [TargetLanguage; 4] = [
+        TargetLanguage::Sigma,
+        TargetLanguage::Splunk,
+        TargetLanguage::QRadar,
+        TargetLanguage::Sentinel,
+    ];
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            TargetLanguage::Sigma => "Sigma (YAML)",
+            TargetLanguage::Splunk => "Splunk (SPL)",
+            TargetLanguage::QRadar => "QRadar (AQL)",
+            TargetLanguage::Sentinel => "Sentinel (KQL)",
+        }
+    }
 }
 
 pub struct ToolSelectorApp {
@@ -75,8 +89,9 @@ pub struct ToolSelectorApp {
     /// true once filter_report.txt has been written for the current run
     pub report_written: bool,
 
-    /// Native (per-tool) vs Sentinel (convert Sigma to KQL) output mode.
-    pub output_mode: OutputMode,
+    /// Comment above the field kept for clarity: `None` = per-tool native
+    /// output, `Some(lang)` = convert everything convertible to `lang`.
+    pub output_mode: Option<TargetLanguage>,
 }
 
 impl Default for ToolSelectorApp {
@@ -101,7 +116,7 @@ impl Default for ToolSelectorApp {
             technique_input: String::new(),
             last_filter: None,
             report_written: false,
-            output_mode: OutputMode::default(),
+            output_mode: None,
         }
     }
 }
