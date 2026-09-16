@@ -74,8 +74,11 @@ impl App for MainApp {
                         if ui
                             .add(
                                 egui::Button::new(
-                                    egui::RichText::new("🛠 Rules").color(Color32::WHITE),
+                                    egui::RichText::new("🛠 Rules")
+                                        .size(70.0)
+                                        .color(Color32::WHITE),
                                 )
+                                .min_size(egui::vec2(500.0, 150.0))
                                 .fill(Color32::from_rgb(70, 130, 180)), // SteelBlue
                             )
                             .clicked()
@@ -87,8 +90,11 @@ impl App for MainApp {
                         if ui
                             .add(
                                 egui::Button::new(
-                                    egui::RichText::new("📥 IOCs").color(Color32::WHITE),
+                                    egui::RichText::new("📥 IOCs")
+                                        .size(70.0)
+                                        .color(Color32::WHITE),
                                 )
+                                .min_size(egui::vec2(500.0, 150.0))
                                 .fill(Color32::from_rgb(60, 179, 113)), // MediumSeaGreen
                             )
                             .clicked()
