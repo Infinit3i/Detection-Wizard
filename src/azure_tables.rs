@@ -260,6 +260,19 @@ const fn t(
     }
 }
 
+/// Reverse lookup: the first AZURE_TABLES entry whose sigma_services
+/// contains `service` (case-insensitive). None if no table maps to it.
+pub fn table_for_sigma_service(service: &str) -> Option<&'static str> {
+    AZURE_TABLES
+        .iter()
+        .find(|d| {
+            d.sigma_services
+                .iter()
+                .any(|s| s.eq_ignore_ascii_case(service))
+        })
+        .map(|d| d.name)
+}
+
 /// Union of sigma services for a set of selected table names.
 pub fn sigma_services_for(selected_names: &[String]) -> Vec<String> {
     let mut out: Vec<String> = AZURE_TABLES

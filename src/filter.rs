@@ -853,7 +853,9 @@ impl CompiledFilter {
 
 /// Extract product/service/category from the first `logsource:` block of a sigma YAML.
 /// Lightweight line scan — avoids pulling in a YAML parser for three keys.
-fn parse_sigma_logsource(content: &str) -> (Option<String>, Option<String>, Option<String>) {
+pub(crate) fn parse_sigma_logsource(
+    content: &str,
+) -> (Option<String>, Option<String>, Option<String>) {
     let mut product = None;
     let mut service = None;
     let mut category = None;
