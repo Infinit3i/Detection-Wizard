@@ -116,200 +116,212 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                     }
                 }
 
-                // ---------- Log source targeting ----------
+                // ---------- Log sources / tables / sourcetypes (one combined dropdown) ----------
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
                 let src_count = app.source_selected.iter().filter(|&&v| v).count();
-                let src_header = if src_count > 0 {
-                    format!("Log sources ({} selected)", src_count)
-                } else {
-                    "Log sources (all included)".to_string()
-                };
-                egui::CollapsingHeader::new(src_header)
-                    .id_salt("log_sources_header")
-                    .show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new(
-                                "Nothing selected = all log sources included. Selecting sources \
-                                 keeps only rules that positively match them; unclassifiable \
-                                 rules are dropped (strict).",
-                            )
-                            .size(12.0)
-                            .color(egui::Color32::GRAY),
-                        );
-                        ui.add_space(6.0);
-                        ui.horizontal(|ui| {
-                            ui.label("Search:");
-                            ui.text_edit_singleline(&mut app.source_search);
-                            if src_count > 0 && ui.small_button("Clear").clicked() {
-                                for v in app.source_selected.iter_mut() {
-                                    *v = false;
-                                }
-                            }
-                        });
-                        ui.add_space(4.0);
-
-                        let src_needle = app.source_search.to_lowercase();
-                        for (i, def) in LOG_SOURCES.iter().enumerate() {
-                            if !src_needle.is_empty()
-                                && !def.label.to_lowercase().contains(&src_needle)
-                                && !def.id.to_lowercase().contains(&src_needle)
-                            {
-                                continue;
-                            }
-                            ui.checkbox(&mut app.source_selected[i], def.label);
-                        }
-                    });
-
-                // ---------- Granular Azure / M365 table targeting ----------
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(10.0);
                 let table_count = app.azure_table_selected.iter().filter(|&&v| v).count();
-                let header = if table_count > 0 {
-                    format!("Azure / M365 log tables ({} selected)", table_count)
-                } else {
-                    "Azure / M365 log tables (all included)".to_string()
-                };
-                egui::CollapsingHeader::new(header)
-                    .id_salt("azure_tables_header")
-                    .default_open(app.azure_tables_open)
-                    .show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new(
-                                "Pick the exact Log Analytics / Sentinel / Defender tables you \
-                                 ingest. Selecting any table keeps only rules that reference a \
-                                 selected table (or whose sigma logsource maps to one).",
-                            )
-                            .size(12.0)
-                            .color(egui::Color32::GRAY),
-                        );
-                        ui.add_space(6.0);
-                        ui.horizontal(|ui| {
-                            ui.label("Search:");
-                            ui.text_edit_singleline(&mut app.azure_table_search);
-                            if table_count > 0 && ui.small_button("Clear").clicked() {
-                                for v in app.azure_table_selected.iter_mut() {
-                                    *v = false;
-                                }
-                            }
-                        });
-                        ui.add_space(4.0);
-
-                        let needle = app.azure_table_search.to_lowercase();
-                        egui::ScrollArea::vertical()
-                            .id_salt("azure_table_scroll")
-                            .max_height(260.0)
-                            .show(ui, |ui| {
-                                let mut last_category = "";
-                                for (i, def) in AZURE_TABLES.iter().enumerate() {
-                                    if !needle.is_empty()
-                                        && !def.name.to_lowercase().contains(&needle)
-                                        && !def.category.to_lowercase().contains(&needle)
-                                    {
-                                        continue;
-                                    }
-                                    if def.category != last_category {
-                                        ui.add_space(6.0);
-                                        ui.label(
-                                            egui::RichText::new(def.category)
-                                                .strong()
-                                                .size(13.0),
-                                        );
-                                        last_category = def.category;
-                                    }
-                                    // "Select all in category" convenience row
-                                    ui.checkbox(&mut app.azure_table_selected[i], def.name);
-                                }
-                            });
-
-                        ui.add_space(4.0);
-                        ui.horizontal(|ui| {
-                            if ui.small_button("Select all visible").clicked() {
-                                for (i, def) in AZURE_TABLES.iter().enumerate() {
-                                    if needle.is_empty()
-                                        || def.name.to_lowercase().contains(&needle)
-                                        || def.category.to_lowercase().contains(&needle)
-                                    {
-                                        app.azure_table_selected[i] = true;
-                                    }
-                                }
-                            }
-                        });
-                    });
-
-                // ---------- Granular Splunk sourcetype targeting ----------
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(10.0);
                 let st_count = app.sourcetype_selected.iter().filter(|&&v| v).count();
-                let st_header = if st_count > 0 {
-                    format!("Splunk sourcetypes ({} selected)", st_count)
+                let where_total = src_count + table_count + st_count;
+                let where_header = if where_total > 0 {
+                    format!("Where the logs come from ({} selected)", where_total)
                 } else {
-                    "Splunk sourcetypes (all included)".to_string()
+                    "Where the logs come from (all included)".to_string()
                 };
-                egui::CollapsingHeader::new(st_header)
-                    .id_salt("splunk_sourcetypes_header")
-                    .default_open(app.sourcetypes_open)
+                egui::CollapsingHeader::new(where_header)
+                    .id_salt("where_header")
+                    .default_open(app.azure_tables_open || app.sourcetypes_open)
                     .show(ui, |ui| {
                         ui.label(
                             egui::RichText::new(
-                                "Pick the exact sourcetypes you ingest in Splunk. Selecting any \
-                                 sourcetype keeps only rules that reference a selected sourcetype.",
+                                "Nothing selected in any of the three lists below = everything \
+                                 included. A rule passes if it positively matches ANY selection \
+                                 across log sources, tables, or sourcetypes (they OR together); \
+                                 unclassifiable rules are dropped once any of the three is active \
+                                 (strict).",
                             )
                             .size(12.0)
                             .color(egui::Color32::GRAY),
                         );
-                        ui.add_space(6.0);
-                        ui.horizontal(|ui| {
-                            ui.label("Search:");
-                            ui.text_edit_singleline(&mut app.sourcetype_search);
-                            if st_count > 0 && ui.small_button("Clear").clicked() {
-                                for v in app.sourcetype_selected.iter_mut() {
-                                    *v = false;
-                                }
-                            }
-                        });
-                        ui.add_space(4.0);
+                        ui.add_space(8.0);
 
-                        let st_needle = app.sourcetype_search.to_lowercase();
-                        egui::ScrollArea::vertical()
-                            .id_salt("sourcetype_scroll")
-                            .max_height(260.0)
+                        // ---- Log sources (coarse buckets) ----
+                        let src_sub_header = if src_count > 0 {
+                            format!("Log sources ({} selected)", src_count)
+                        } else {
+                            "Log sources (all included)".to_string()
+                        };
+                        egui::CollapsingHeader::new(src_sub_header)
+                            .id_salt("log_sources_header")
                             .show(ui, |ui| {
-                                let mut last_category = "";
-                                for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
-                                    if !st_needle.is_empty()
-                                        && !def.name.to_lowercase().contains(&st_needle)
-                                        && !def.category.to_lowercase().contains(&st_needle)
+                                ui.horizontal(|ui| {
+                                    ui.label("Search:");
+                                    ui.text_edit_singleline(&mut app.source_search);
+                                    if src_count > 0 && ui.small_button("Clear").clicked() {
+                                        for v in app.source_selected.iter_mut() {
+                                            *v = false;
+                                        }
+                                    }
+                                });
+                                ui.add_space(4.0);
+
+                                let src_needle = app.source_search.to_lowercase();
+                                for (i, def) in LOG_SOURCES.iter().enumerate() {
+                                    if !src_needle.is_empty()
+                                        && !def.label.to_lowercase().contains(&src_needle)
+                                        && !def.id.to_lowercase().contains(&src_needle)
                                     {
                                         continue;
                                     }
-                                    if def.category != last_category {
-                                        ui.add_space(6.0);
-                                        ui.label(
-                                            egui::RichText::new(def.category).strong().size(13.0),
-                                        );
-                                        last_category = def.category;
-                                    }
-                                    ui.checkbox(&mut app.sourcetype_selected[i], def.name);
+                                    ui.checkbox(&mut app.source_selected[i], def.label);
                                 }
                             });
 
-                        ui.add_space(4.0);
-                        ui.horizontal(|ui| {
-                            if ui.small_button("Select all visible").clicked() {
-                                for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
-                                    if st_needle.is_empty()
-                                        || def.name.to_lowercase().contains(&st_needle)
-                                        || def.category.to_lowercase().contains(&st_needle)
-                                    {
-                                        app.sourcetype_selected[i] = true;
+                        ui.add_space(6.0);
+
+                        // ---- Granular Azure / M365 tables ----
+                        let table_sub_header = if table_count > 0 {
+                            format!("Azure / M365 log tables ({} selected)", table_count)
+                        } else {
+                            "Azure / M365 log tables (all included)".to_string()
+                        };
+                        egui::CollapsingHeader::new(table_sub_header)
+                            .id_salt("azure_tables_header")
+                            .default_open(app.azure_tables_open)
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new(
+                                        "Pick the exact Log Analytics / Sentinel / Defender \
+                                         tables you ingest.",
+                                    )
+                                    .size(12.0)
+                                    .color(egui::Color32::GRAY),
+                                );
+                                ui.add_space(4.0);
+                                ui.horizontal(|ui| {
+                                    ui.label("Search:");
+                                    ui.text_edit_singleline(&mut app.azure_table_search);
+                                    if table_count > 0 && ui.small_button("Clear").clicked() {
+                                        for v in app.azure_table_selected.iter_mut() {
+                                            *v = false;
+                                        }
                                     }
-                                }
-                            }
-                        });
+                                });
+                                ui.add_space(4.0);
+
+                                let needle = app.azure_table_search.to_lowercase();
+                                egui::ScrollArea::vertical()
+                                    .id_salt("azure_table_scroll")
+                                    .max_height(220.0)
+                                    .show(ui, |ui| {
+                                        let mut last_category = "";
+                                        for (i, def) in AZURE_TABLES.iter().enumerate() {
+                                            if !needle.is_empty()
+                                                && !def.name.to_lowercase().contains(&needle)
+                                                && !def.category.to_lowercase().contains(&needle)
+                                            {
+                                                continue;
+                                            }
+                                            if def.category != last_category {
+                                                ui.add_space(6.0);
+                                                ui.label(
+                                                    egui::RichText::new(def.category)
+                                                        .strong()
+                                                        .size(13.0),
+                                                );
+                                                last_category = def.category;
+                                            }
+                                            ui.checkbox(&mut app.azure_table_selected[i], def.name);
+                                        }
+                                    });
+
+                                ui.add_space(4.0);
+                                ui.horizontal(|ui| {
+                                    if ui.small_button("Select all visible").clicked() {
+                                        for (i, def) in AZURE_TABLES.iter().enumerate() {
+                                            if needle.is_empty()
+                                                || def.name.to_lowercase().contains(&needle)
+                                                || def.category.to_lowercase().contains(&needle)
+                                            {
+                                                app.azure_table_selected[i] = true;
+                                            }
+                                        }
+                                    }
+                                });
+                            });
+
+                        ui.add_space(6.0);
+
+                        // ---- Granular Splunk sourcetypes ----
+                        let st_sub_header = if st_count > 0 {
+                            format!("Splunk sourcetypes ({} selected)", st_count)
+                        } else {
+                            "Splunk sourcetypes (all included)".to_string()
+                        };
+                        egui::CollapsingHeader::new(st_sub_header)
+                            .id_salt("splunk_sourcetypes_header")
+                            .default_open(app.sourcetypes_open)
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new(
+                                        "Pick the exact sourcetypes you ingest in Splunk.",
+                                    )
+                                    .size(12.0)
+                                    .color(egui::Color32::GRAY),
+                                );
+                                ui.add_space(4.0);
+                                ui.horizontal(|ui| {
+                                    ui.label("Search:");
+                                    ui.text_edit_singleline(&mut app.sourcetype_search);
+                                    if st_count > 0 && ui.small_button("Clear").clicked() {
+                                        for v in app.sourcetype_selected.iter_mut() {
+                                            *v = false;
+                                        }
+                                    }
+                                });
+                                ui.add_space(4.0);
+
+                                let st_needle = app.sourcetype_search.to_lowercase();
+                                egui::ScrollArea::vertical()
+                                    .id_salt("sourcetype_scroll")
+                                    .max_height(220.0)
+                                    .show(ui, |ui| {
+                                        let mut last_category = "";
+                                        for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
+                                            if !st_needle.is_empty()
+                                                && !def.name.to_lowercase().contains(&st_needle)
+                                                && !def.category.to_lowercase().contains(&st_needle)
+                                            {
+                                                continue;
+                                            }
+                                            if def.category != last_category {
+                                                ui.add_space(6.0);
+                                                ui.label(
+                                                    egui::RichText::new(def.category)
+                                                        .strong()
+                                                        .size(13.0),
+                                                );
+                                                last_category = def.category;
+                                            }
+                                            ui.checkbox(&mut app.sourcetype_selected[i], def.name);
+                                        }
+                                    });
+
+                                ui.add_space(4.0);
+                                ui.horizontal(|ui| {
+                                    if ui.small_button("Select all visible").clicked() {
+                                        for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
+                                            if st_needle.is_empty()
+                                                || def.name.to_lowercase().contains(&st_needle)
+                                                || def.category.to_lowercase().contains(&st_needle)
+                                            {
+                                                app.sourcetype_selected[i] = true;
+                                            }
+                                        }
+                                    }
+                                });
+                            });
                     });
 
                 // ---------- APT targeting ----------
