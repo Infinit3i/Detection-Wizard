@@ -2,6 +2,7 @@ use super::rule_menu::ToolSelectorApp;
 use super::{qradar, sentinel, sigma, splunk, suricata, sysmon, yara};
 use crate::apt_catalog::{APT_GROUPS, expand_terms};
 use crate::azure_tables::AZURE_TABLES;
+use crate::download::render_nav_buttons;
 use crate::download::render_output_path_selector;
 use crate::filter::{CompiledFilter, LOG_SOURCES};
 use crate::splunk_sourcetypes::SPLUNK_SOURCETYPES;
@@ -11,7 +12,7 @@ use egui::Margin;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_menu: impl FnMut()) {
+pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: impl FnMut()) {
     // Hover text (e.g. on shortened filter labels) waits 2s before showing.
     ctx.style_mut(|style| style.interaction.tooltip_delay = 2.0);
     egui::CentralPanel::default()
@@ -887,17 +888,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                 ui.add_space(30.0);
                 ui.separator();
                 ui.add_space(40.0);
-                if ui
-                    .add(
-                        egui::Button::new(
-                            egui::RichText::new("⬅ Menu").color(egui::Color32::WHITE),
-                        )
-                        .fill(egui::Color32::from_rgb(140, 115, 95)), // muted gray-orange
-                    )
-                    .clicked()
-                {
-                    back_to_menu();
-                }
+                render_nav_buttons(ui, Some(back_to_menu));
             });
         });
 }

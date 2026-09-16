@@ -1,3 +1,4 @@
+use crate::download::render_nav_buttons;
 use crate::ioc::ioc_menu::IOCSelectorApp;
 use crate::ioc::ui_ioc;
 use crate::rules::rule_menu::ToolSelectorApp;
@@ -105,18 +106,11 @@ impl App for MainApp {
                                     new_screen = Some(Screen::IOCDownloader(Default::default()));
                                 }
                             });
-                            ui.add_space(40.0);
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        egui::RichText::new("❌ Quit").color(Color32::WHITE),
-                                    )
-                                    .fill(Color32::from_rgb(220, 20, 60)), // Crimson
-                                )
-                                .clicked()
-                            {
-                                std::process::exit(0);
-                            }
+                        });
+
+                        // Bottom-left nav row, same placement/color as every other screen.
+                        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                            render_nav_buttons(ui, None::<fn()>);
                         });
                     });
             }

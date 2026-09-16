@@ -1,4 +1,5 @@
 use super::ioc_menu::{IOCSelectorApp, OutputFormat};
+use crate::download::render_nav_buttons;
 use crate::download::render_output_path_selector;
 use crate::download::{DownloadFormat, start_download};
 use eframe::egui;
@@ -11,11 +12,7 @@ use std::path::Path;
 use std::sync::Arc;
 use walkdir::WalkDir;
 
-pub fn render_ui_ioc(
-    app: &mut IOCSelectorApp,
-    ctx: &egui::Context,
-    mut back_to_menu: impl FnMut(),
-) {
+pub fn render_ui_ioc(app: &mut IOCSelectorApp, ctx: &egui::Context, back_to_menu: impl FnMut()) {
     egui::CentralPanel::default()
         .frame(
             egui::Frame::default()
@@ -246,17 +243,7 @@ pub fn render_ui_ioc(
             ui.add_space(30.0);
             ui.separator();
             ui.add_space(40.0);
-            if ui
-                .add(
-                    egui::Button::new(
-                        egui::RichText::new("⬅ Back to Menu").color(egui::Color32::WHITE),
-                    )
-                    .fill(egui::Color32::from_rgb(255, 140, 0)),
-                )
-                .clicked()
-            {
-                back_to_menu();
-            }
+            render_nav_buttons(ui, Some(back_to_menu));
         });
 }
 

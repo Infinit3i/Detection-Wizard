@@ -160,6 +160,40 @@ pub fn render_output_path_selector(
     }
 }
 
+/// Shared nav-button color for every screen's "go back / quit" row, so the
+/// Rules, IOCs, and main menu screens can never drift out of sync.
+pub const NAV_BUTTON_COLOR: Color32 = Color32::from_rgb(140, 115, 95); // muted gray-orange
+
+/// Bottom-left "⬅ Menu" + "❌ Quit" button row, shared by every screen that
+/// has a back-to-menu action (the main menu itself only shows Quit).
+/// `on_back` is called when Menu is clicked; pass `None` to omit that button
+/// (e.g. on the main menu, which has nowhere further back to go).
+pub fn render_nav_buttons(ui: &mut egui::Ui, mut on_back: Option<impl FnMut()>) {
+    ui.horizontal(|ui| {
+        if let Some(on_back) = on_back.as_mut() {
+            if ui
+                .add(
+                    egui::Button::new(egui::RichText::new("⬅ Menu").color(Color32::WHITE))
+                        .fill(NAV_BUTTON_COLOR),
+                )
+                .clicked()
+            {
+                on_back();
+            }
+        }
+
+        if ui
+            .add(
+                egui::Button::new(egui::RichText::new("❌ Quit").color(Color32::WHITE))
+                    .fill(NAV_BUTTON_COLOR),
+            )
+            .clicked()
+        {
+            std::process::exit(0);
+        }
+    });
+}
+
 /// Clone repo to a temp dir and copy only files with allowed extensions into dest_dir
 fn clone_and_copy_filtered(
     repo_url: &str,
