@@ -66,55 +66,58 @@ impl App for MainApp {
                             .outer_margin(Margin::same(20)),
                     )
                     .show(ctx, |ui| {
-                        ui.heading("🔧 Detection Wizard");
-                        ui.separator();
-                        ui.add_space(10.0);
-                        ui.label("Choose IOA or IOC:");
-                        ui.add_space(15.0);
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    egui::RichText::new("🛠 Rules")
-                                        .size(42.0)
-                                        .color(Color32::WHITE),
-                                )
-                                .min_size(egui::vec2(300.0, 90.0))
-                                .corner_radius(12)
-                                .fill(Color32::from_rgb(70, 130, 180)), // SteelBlue
-                            )
-                            .clicked()
-                        {
-                            new_screen = Some(Screen::ToolSelector(Default::default()));
-                        }
-                        ui.add_space(5.0);
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(ui.available_height() / 3.0);
+                            ui.heading("🔧 Detection Wizard");
+                            ui.add_space(20.0);
+                            ui.horizontal(|ui| {
+                                ui.add_space((ui.available_width() - (300.0 * 2.0 + 5.0)) / 2.0);
+                                if ui
+                                    .add(
+                                        egui::Button::new(
+                                            egui::RichText::new("🛠 Rules")
+                                                .size(42.0)
+                                                .color(Color32::WHITE),
+                                        )
+                                        .min_size(egui::vec2(300.0, 90.0))
+                                        .corner_radius(12)
+                                        .fill(Color32::from_rgb(70, 130, 180)), // SteelBlue
+                                    )
+                                    .clicked()
+                                {
+                                    new_screen = Some(Screen::ToolSelector(Default::default()));
+                                }
+                                ui.add_space(5.0);
 
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    egui::RichText::new("📥 IOCs")
-                                        .size(42.0)
-                                        .color(Color32::WHITE),
+                                if ui
+                                    .add(
+                                        egui::Button::new(
+                                            egui::RichText::new("📥 IOCs")
+                                                .size(42.0)
+                                                .color(Color32::WHITE),
+                                        )
+                                        .min_size(egui::vec2(300.0, 90.0))
+                                        .corner_radius(12)
+                                        .fill(Color32::from_rgb(60, 179, 113)), // MediumSeaGreen
+                                    )
+                                    .clicked()
+                                {
+                                    new_screen = Some(Screen::IOCDownloader(Default::default()));
+                                }
+                            });
+                            ui.add_space(40.0);
+                            if ui
+                                .add(
+                                    egui::Button::new(
+                                        egui::RichText::new("❌ Quit").color(Color32::WHITE),
+                                    )
+                                    .fill(Color32::from_rgb(220, 20, 60)), // Crimson
                                 )
-                                .min_size(egui::vec2(300.0, 90.0))
-                                .corner_radius(12)
-                                .fill(Color32::from_rgb(60, 179, 113)), // MediumSeaGreen
-                            )
-                            .clicked()
-                        {
-                            new_screen = Some(Screen::IOCDownloader(Default::default()));
-                        }
-                        ui.add_space(40.0);
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    egui::RichText::new("❌ Quit").color(Color32::WHITE),
-                                )
-                                .fill(Color32::from_rgb(220, 20, 60)), // Crimson
-                            )
-                            .clicked()
-                        {
-                            std::process::exit(0);
-                        }
+                                .clicked()
+                            {
+                                std::process::exit(0);
+                            }
+                        });
                     });
             }
         }
