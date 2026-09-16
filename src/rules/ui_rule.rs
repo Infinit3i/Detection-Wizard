@@ -399,25 +399,14 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                         match app.where_tab {
                             // ---- General categories (coarse log-source buckets) ----
                             Some(0) => {
-                                ui.horizontal(|ui| {
-                                    ui.label("Search:");
-                                    ui.text_edit_singleline(&mut app.source_search);
-                                    if src_count > 0 && ui.small_button("Clear").clicked() {
-                                        for v in app.source_selected.iter_mut() {
-                                            *v = false;
-                                        }
+                                if src_count > 0 && ui.small_button("Clear").clicked() {
+                                    for v in app.source_selected.iter_mut() {
+                                        *v = false;
                                     }
-                                });
+                                }
                                 ui.add_space(4.0);
 
-                                let src_needle = app.source_search.to_lowercase();
                                 for (i, def) in LOG_SOURCES.iter().enumerate() {
-                                    if !src_needle.is_empty()
-                                        && !def.label.to_lowercase().contains(&src_needle)
-                                        && !def.id.to_lowercase().contains(&src_needle)
-                                    {
-                                        continue;
-                                    }
                                     ui.checkbox(&mut app.source_selected[i], def.label);
                                 }
                             }
@@ -433,30 +422,19 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                                     .color(egui::Color32::GRAY),
                                 );
                                 ui.add_space(4.0);
-                                ui.horizontal(|ui| {
-                                    ui.label("Search:");
-                                    ui.text_edit_singleline(&mut app.azure_table_search);
-                                    if table_count > 0 && ui.small_button("Clear").clicked() {
-                                        for v in app.azure_table_selected.iter_mut() {
-                                            *v = false;
-                                        }
+                                if table_count > 0 && ui.small_button("Clear").clicked() {
+                                    for v in app.azure_table_selected.iter_mut() {
+                                        *v = false;
                                     }
-                                });
+                                }
                                 ui.add_space(4.0);
 
-                                let needle = app.azure_table_search.to_lowercase();
                                 egui::ScrollArea::vertical()
                                     .id_salt("azure_table_scroll")
                                     .max_height(320.0)
                                     .show(ui, |ui| {
                                         let mut last_category = "";
                                         for (i, def) in AZURE_TABLES.iter().enumerate() {
-                                            if !needle.is_empty()
-                                                && !def.name.to_lowercase().contains(&needle)
-                                                && !def.category.to_lowercase().contains(&needle)
-                                            {
-                                                continue;
-                                            }
                                             if def.category != last_category {
                                                 ui.add_space(6.0);
                                                 ui.label(
@@ -472,14 +450,9 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
 
                                 ui.add_space(4.0);
                                 ui.horizontal(|ui| {
-                                    if ui.small_button("Select all visible").clicked() {
-                                        for (i, def) in AZURE_TABLES.iter().enumerate() {
-                                            if needle.is_empty()
-                                                || def.name.to_lowercase().contains(&needle)
-                                                || def.category.to_lowercase().contains(&needle)
-                                            {
-                                                app.azure_table_selected[i] = true;
-                                            }
+                                    if ui.small_button("Select all").clicked() {
+                                        for v in app.azure_table_selected.iter_mut() {
+                                            *v = true;
                                         }
                                     }
                                 });
@@ -495,30 +468,19 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                                     .color(egui::Color32::GRAY),
                                 );
                                 ui.add_space(4.0);
-                                ui.horizontal(|ui| {
-                                    ui.label("Search:");
-                                    ui.text_edit_singleline(&mut app.sourcetype_search);
-                                    if st_count > 0 && ui.small_button("Clear").clicked() {
-                                        for v in app.sourcetype_selected.iter_mut() {
-                                            *v = false;
-                                        }
+                                if st_count > 0 && ui.small_button("Clear").clicked() {
+                                    for v in app.sourcetype_selected.iter_mut() {
+                                        *v = false;
                                     }
-                                });
+                                }
                                 ui.add_space(4.0);
 
-                                let st_needle = app.sourcetype_search.to_lowercase();
                                 egui::ScrollArea::vertical()
                                     .id_salt("sourcetype_scroll")
                                     .max_height(320.0)
                                     .show(ui, |ui| {
                                         let mut last_category = "";
                                         for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
-                                            if !st_needle.is_empty()
-                                                && !def.name.to_lowercase().contains(&st_needle)
-                                                && !def.category.to_lowercase().contains(&st_needle)
-                                            {
-                                                continue;
-                                            }
                                             if def.category != last_category {
                                                 ui.add_space(6.0);
                                                 ui.label(
@@ -534,14 +496,9 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
 
                                 ui.add_space(4.0);
                                 ui.horizontal(|ui| {
-                                    if ui.small_button("Select all visible").clicked() {
-                                        for (i, def) in SPLUNK_SOURCETYPES.iter().enumerate() {
-                                            if st_needle.is_empty()
-                                                || def.name.to_lowercase().contains(&st_needle)
-                                                || def.category.to_lowercase().contains(&st_needle)
-                                            {
-                                                app.sourcetype_selected[i] = true;
-                                            }
+                                    if ui.small_button("Select all").clicked() {
+                                        for v in app.sourcetype_selected.iter_mut() {
+                                            *v = true;
                                         }
                                     }
                                 });
@@ -553,26 +510,18 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
 
                     // ---- APT ----
                     Some(1) => {
-                        ui.horizontal(|ui| {
-                            ui.label("Search:");
-                            ui.text_edit_singleline(&mut app.apt_search);
-                            if apt_count > 0 && ui.small_button("Clear").clicked() {
-                                for v in app.apt_selected.iter_mut() {
-                                    *v = false;
-                                }
+                        if apt_count > 0 && ui.small_button("Clear").clicked() {
+                            for v in app.apt_selected.iter_mut() {
+                                *v = false;
                             }
-                        });
+                        }
                         ui.add_space(4.0);
 
-                        let needle = app.apt_search.to_lowercase();
                         egui::ScrollArea::vertical()
                             .id_salt("apt_scroll")
                             .max_height(320.0)
                             .show(ui, |ui| {
                                 for (i, g) in APT_GROUPS.iter().enumerate() {
-                                    if !g.matches_search(&needle) {
-                                        continue;
-                                    }
                                     let label = if g.origin.is_empty() {
                                         format!("{} ({})", g.name, g.mitre_id)
                                     } else {
@@ -598,31 +547,19 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
 
                     // ---- TTPs ----
                     Some(2) => {
-                        ui.horizontal(|ui| {
-                            ui.label("Search:");
-                            ui.text_edit_singleline(&mut app.ttp_search);
-                            if ttp_count > 0 && ui.small_button("Clear").clicked() {
-                                for v in app.ttp_selected.iter_mut() {
-                                    *v = false;
-                                }
+                        if ttp_count > 0 && ui.small_button("Clear").clicked() {
+                            for v in app.ttp_selected.iter_mut() {
+                                *v = false;
                             }
-                        });
+                        }
                         ui.add_space(4.0);
 
-                        let ttp_needle = app.ttp_search.to_lowercase();
                         egui::ScrollArea::vertical()
                             .id_salt("ttp_scroll")
                             .max_height(320.0)
                             .show(ui, |ui| {
                                 let mut last_tactic = "";
                                 for (i, def) in TTP_CATALOG.iter().enumerate() {
-                                    if !ttp_needle.is_empty()
-                                        && !def.id.to_lowercase().contains(&ttp_needle)
-                                        && !def.name.to_lowercase().contains(&ttp_needle)
-                                        && !def.tactic.to_lowercase().contains(&ttp_needle)
-                                    {
-                                        continue;
-                                    }
                                     if def.tactic != last_tactic {
                                         ui.add_space(6.0);
                                         ui.label(

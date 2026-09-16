@@ -17,28 +17,20 @@ pub struct ToolSelectorApp {
     // --- Targeting: log sources / tables ---
     /// parallel to crate::filter::LOG_SOURCES; all false = no source filter (grab everything)
     pub source_selected: Vec<bool>,
-    /// live search box for the log source list
-    pub source_search: String,
 
     // --- Targeting: APT groups ---
     /// parallel to crate::apt_catalog::APT_GROUPS; all false = no APT filter
     pub apt_selected: Vec<bool>,
-    /// live search box for the APT list
-    pub apt_search: String,
     /// extra comma-separated free-text terms (actor/malware names not in the catalog)
     pub apt_custom_terms: String,
 
     // --- Targeting: granular Azure/M365 log tables ---
     /// parallel to crate::azure_tables::AZURE_TABLES; all false = table filter off
     pub azure_table_selected: Vec<bool>,
-    /// live search box for the table list
-    pub azure_table_search: String,
 
     // --- Targeting: granular Splunk sourcetypes ---
     /// parallel to crate::splunk_sourcetypes::SPLUNK_SOURCETYPES; all false = filter off
     pub sourcetype_selected: Vec<bool>,
-    /// live search box for the sourcetype list
-    pub sourcetype_search: String,
 
     /// which of the three "log sources" sub-pickers is expanded (General
     /// categories / Azure tables / Splunk sourcetypes); only one at a time,
@@ -57,8 +49,6 @@ pub struct ToolSelectorApp {
     // --- Targeting: MITRE ATT&CK techniques ---
     /// parallel to crate::ttp_catalog::TTP_CATALOG; all false = no TTP filter
     pub ttp_selected: Vec<bool>,
-    /// live search box for the TTP list
-    pub ttp_search: String,
     /// extra comma/space-separated T-codes not in the catalog
     pub technique_input: String,
 
@@ -79,19 +69,14 @@ impl Default for ToolSelectorApp {
             custom_path: None,
             cancel_flag: Arc::new(AtomicBool::new(false)),
             source_selected: vec![false; LOG_SOURCES.len()],
-            source_search: String::new(),
             apt_selected: vec![false; APT_GROUPS.len()],
-            apt_search: String::new(),
             apt_custom_terms: String::new(),
             azure_table_selected: vec![false; AZURE_TABLES.len()],
-            azure_table_search: String::new(),
             sourcetype_selected: vec![false; SPLUNK_SOURCETYPES.len()],
-            sourcetype_search: String::new(),
             where_tab: None,
             filter_tab: None,
             filter_search: String::new(),
             ttp_selected: vec![false; TTP_CATALOG.len()],
-            ttp_search: String::new(),
             technique_input: String::new(),
             last_filter: None,
             report_written: false,

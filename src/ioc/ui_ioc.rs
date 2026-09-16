@@ -107,7 +107,7 @@ pub fn render_ui_ioc(app: &mut IOCSelectorApp, ctx: &egui::Context, back_to_menu
             }
 
             if !show_progress {
-                ui.heading("Select IOC types to download:");
+                ui.heading("Select IOCs:");
 
                 ui.horizontal_wrapped(|ui| {
                     for (i, name) in app.ioc_types.iter().enumerate() {
