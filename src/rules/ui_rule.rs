@@ -1,5 +1,5 @@
 use super::rule_menu::ToolSelectorApp;
-use super::{qradar, sigma, splunk, suricata, sysmon, yara};
+use super::{qradar, sentinel, sigma, splunk, suricata, sysmon, yara};
 use crate::apt_catalog::{APT_GROUPS, expand_terms};
 use crate::azure_tables::AZURE_TABLES;
 use crate::download::render_output_path_selector;
@@ -496,10 +496,11 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                         && !tool_on("Sigma")
                         && !tool_on("Splunk")
                         && !tool_on("QRadar")
+                        && !tool_on("Sentinel")
                     {
                         warnings.push(
-                            "Azure/M365 tables are selected but none of Sigma, Splunk or QRadar \
-                             is checked — no selected tool consumes table filters."
+                            "Azure/M365 tables are selected but none of Sigma, Splunk, QRadar or \
+                             Sentinel is checked — no selected tool consumes table filters."
                                 .to_string(),
                         );
                     }
@@ -755,6 +756,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                             "Sigma" => total_work += sigma::sigma_total_sources(),
                             "Splunk" => total_work += splunk::splunk_total_sources(),
                             "QRadar" => total_work += qradar::qradar_total_sources(),
+                            "Sentinel" => total_work += sentinel::sentinel_total_sources(),
                             "Sysmon" => total_work += sysmon::sysmon_total_sources(),
                             _ => {}
                         }
@@ -803,6 +805,13 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
                                 filter_clone,
                             ),
                             "QRadar" => qradar::process_qradar(
+                                &out_path,
+                                Arc::clone(&progress_triplet),
+                                ctx_clone.clone(),
+                                Arc::clone(&cancel_flag),
+                                filter_clone,
+                            ),
+                            "Sentinel" => sentinel::process_sentinel(
                                 &out_path,
                                 Arc::clone(&progress_triplet),
                                 ctx_clone.clone(),

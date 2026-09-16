@@ -1,5 +1,6 @@
 pub mod qradar;
 pub mod rule_menu;
+pub mod sentinel;
 pub mod sigma;
 pub mod splunk;
 pub mod suricata;
