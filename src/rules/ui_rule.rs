@@ -81,7 +81,7 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, mut back_to_men
             }
 
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.heading("Select tools to run:");
+                ui.heading("Select Rules:");
 
                 for (i, name) in app.tool_names.iter().enumerate() {
                     let checkbox = ui.checkbox(&mut app.selected[i], *name);
