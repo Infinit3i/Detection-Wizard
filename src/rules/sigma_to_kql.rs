@@ -1168,6 +1168,263 @@ pub fn parse_spl(spl: &str) -> Result<RuleAst, String> {
     })
 }
 
+// ---------------------------------------------------------------------
+// QRadar AQL (Ariel Query Language)
+// ---------------------------------------------------------------------
+
+/// Render a value as an AQL single-quoted string literal (escaping `'`).
+fn aql_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+/// Render one `FieldMatch` as an AQL boolean predicate suitable for a
+/// `WHERE` clause: `field = 'value'` for Equals, `field LIKE '%value%'`
+/// (wildcard on the appropriate side) for Contains/StartsWith/EndsWith,
+/// and `field IMATCHES 'pattern'` for Regex. Multi-value fields OR their
+/// atoms together in parens.
+fn field_match_aql(fm: &FieldMatch) -> String {
+    let field = &fm.field;
+    let atoms: Vec<String> = fm
+        .values
+        .iter()
+        .map(|v| match fm.modifier {
+            Modifier::Equals => format!("{field} = {}", aql_literal(v)),
+            Modifier::Contains => format!("{field} LIKE {}", aql_literal(&format!("%{v}%"))),
+            Modifier::StartsWith => format!("{field} LIKE {}", aql_literal(&format!("{v}%"))),
+            Modifier::EndsWith => format!("{field} LIKE {}", aql_literal(&format!("%{v}"))),
+            Modifier::Regex => format!("{field} IMATCHES {}", aql_literal(v)),
+        })
+        .collect();
+    if atoms.len() == 1 {
+        atoms.into_iter().next().unwrap()
+    } else {
+        format!("({})", atoms.join(" OR "))
+    }
+}
+
+/// Render one `SelectionBlock` (all its fields AND'd together) as AQL.
+fn block_aql(block: &SelectionBlock) -> String {
+    let atoms: Vec<String> = block.fields.iter().map(field_match_aql).collect();
+    if atoms.len() == 1 {
+        atoms.into_iter().next().unwrap()
+    } else {
+        format!("({})", atoms.join(" AND "))
+    }
+}
+
+/// Render a `ConditionExpr` as an AQL `WHERE` boolean expression. Assumes
+/// `validate_condition_refs` already confirmed every reference resolves.
+fn condition_aql(condition: &ConditionExpr, blocks: &[SelectionBlock]) -> String {
+    match condition {
+        ConditionExpr::Block(name) => {
+            let block = blocks
+                .iter()
+                .find(|b| &b.name == name)
+                .expect("validate_condition_refs guarantees this block exists");
+            block_aql(block)
+        }
+        ConditionExpr::Not(inner) => format!("NOT ({})", condition_aql(inner, blocks)),
+        ConditionExpr::And(list) => list
+            .iter()
+            .map(|e| format!("({})", condition_aql(e, blocks)))
+            .collect::<Vec<_>>()
+            .join(" AND "),
+        ConditionExpr::Or(list) => list
+            .iter()
+            .map(|e| format!("({})", condition_aql(e, blocks)))
+            .collect::<Vec<_>>()
+            .join(" OR "),
+        ConditionExpr::OneOf(pattern) => {
+            let matched = resolve_pattern_blocks(pattern, blocks);
+            let atoms: Vec<String> = matched.iter().map(|b| block_aql(b)).collect();
+            if atoms.len() == 1 {
+                atoms.into_iter().next().unwrap()
+            } else {
+                format!("({})", atoms.join(" OR "))
+            }
+        }
+        ConditionExpr::AllOf(pattern) => {
+            let matched = resolve_pattern_blocks(pattern, blocks);
+            let atoms: Vec<String> = matched.iter().map(|b| block_aql(b)).collect();
+            if atoms.len() == 1 {
+                atoms.into_iter().next().unwrap()
+            } else {
+                format!("({})", atoms.join(" AND "))
+            }
+        }
+    }
+}
+
+/// Emit a QRadar AQL query string from a parsed `RuleAst`: a
+/// `SELECT * FROM <source> WHERE <expr>` statement.
+pub fn to_aql(detection: &RuleAst) -> String {
+    format!(
+        "-- {}\nSELECT * FROM {} WHERE {}\n",
+        detection.title,
+        detection.source,
+        condition_aql(&detection.condition, &detection.blocks)
+    )
+}
+
+/// Parse an AQL single-quoted string literal `'...'` (with `''` as an
+/// escaped quote inside).
+fn parse_aql_literal(s: &str) -> Result<String, String> {
+    let s = s.trim();
+    if s.len() < 2 || !s.starts_with('\'') || !s.ends_with('\'') {
+        return Err(format!("expected a quoted string literal, got: {s}"));
+    }
+    Ok(s[1..s.len() - 1].replace("''", "'"))
+}
+
+/// Determine the wildcard modifier + bare value from a `LIKE` value
+/// (`%value%` -> Contains, `value%` -> StartsWith, `%value` -> EndsWith).
+fn classify_aql_like_wildcard(literal: &str) -> Result<(Modifier, String), String> {
+    let starts = literal.starts_with('%');
+    let ends = literal.ends_with('%') && literal.len() > 1;
+    match (starts, ends) {
+        (true, true) => Ok((
+            Modifier::Contains,
+            literal[1..literal.len() - 1].to_string(),
+        )),
+        (false, true) => Ok((
+            Modifier::StartsWith,
+            literal[..literal.len() - 1].to_string(),
+        )),
+        (true, false) => Ok((Modifier::EndsWith, literal[1..].to_string())),
+        (false, false) => Err(format!("LIKE value has no % wildcard: {literal}")),
+    }
+}
+
+/// Parse `field = 'value'` / `field LIKE '%value%'` / `field IMATCHES
+/// 'pattern'` (single predicate, no `AND`/`OR`).
+fn parse_aql_single_predicate(part: &str) -> Result<(String, Modifier, String), String> {
+    const OPS: &[(&str, Modifier)] = &[
+        (" IMATCHES ", Modifier::Regex),
+        (" MATCHES ", Modifier::Regex),
+        (" LIKE ", Modifier::Contains), // placeholder modifier, replaced below via wildcard classification
+        (" = ", Modifier::Equals),
+    ];
+    for (op_str, modifier) in OPS {
+        if let Some(idx) = part.find(op_str) {
+            let field = part[..idx].trim().to_string();
+            let value_str = part[idx + op_str.len()..].trim();
+            let literal = parse_aql_literal(value_str)?;
+            if op_str.trim() == "LIKE" {
+                let (real_modifier, value) = classify_aql_like_wildcard(&literal)?;
+                return Ok((field, real_modifier, value));
+            }
+            return Ok((field, *modifier, literal));
+        }
+    }
+    Err(format!("unsupported AQL predicate: {part}"))
+}
+
+/// Parse one atom: a single AQL predicate, or a `(pred OR pred OR ...)`
+/// OR-group over the same field (the shape `field_match_aql` emits for
+/// multi-value fields).
+fn parse_aql_atom_or_or_group(atom: &str) -> Result<FieldMatch, String> {
+    let inner = strip_wrapping_parens(atom);
+    let or_parts = split_top_level(inner, " OR ");
+    let mut field_name: Option<String> = None;
+    let mut modifier: Option<Modifier> = None;
+    let mut values = Vec::new();
+    for part in or_parts {
+        let (field, m, value) = parse_aql_single_predicate(part.trim())?;
+        match (&field_name, modifier) {
+            (None, None) => {
+                field_name = Some(field);
+                modifier = Some(m);
+            }
+            (Some(existing_field), Some(existing_modifier)) => {
+                if *existing_field != field || existing_modifier != m {
+                    return Err(format!("OR-group mixes different fields/operators: {atom}"));
+                }
+            }
+            _ => unreachable!(),
+        }
+        values.push(value);
+    }
+    Ok(FieldMatch {
+        field: field_name.ok_or_else(|| format!("empty predicate: {atom}"))?,
+        modifier: modifier.unwrap(),
+        values,
+    })
+}
+
+/// Parse one AQL `WHERE` predicate expression, split on top-level ` AND `,
+/// into the FieldMatch list for one selection block.
+fn parse_aql_predicate(expr: &str) -> Result<Vec<FieldMatch>, String> {
+    let expr = strip_wrapping_parens(expr);
+    let mut fields = Vec::new();
+    for atom in split_top_level(expr, " AND ") {
+        fields.push(parse_aql_atom_or_or_group(atom.trim())?);
+    }
+    Ok(fields)
+}
+
+/// Parse a QRadar AQL query (as emitted by `to_aql`, or a hand-written AQL
+/// search of the same shape) into a `RuleAst`.
+///
+/// Expected shape: optional leading `-- ` comment (the title), then a
+/// single `SELECT * FROM <source> WHERE <expr>` statement. Any other
+/// SELECT clause (aggregate functions, GROUP BY, LAST N DAYS, ...) is
+/// rejected rather than silently ignored, since it could change the
+/// query's meaning.
+pub fn parse_aql(aql: &str) -> Result<RuleAst, String> {
+    let mut title = "Untitled rule".to_string();
+    let mut statement_line: Option<&str> = None;
+
+    for raw_line in aql.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if let Some(comment) = line.strip_prefix("--") {
+            if statement_line.is_none() && title == "Untitled rule" {
+                title = comment.trim().to_string();
+            }
+            continue;
+        }
+        if statement_line.is_some() {
+            return Err(format!("unexpected extra AQL line: {line}"));
+        }
+        statement_line = Some(line);
+    }
+
+    let Some(statement) = statement_line else {
+        return Err("no SELECT statement found in AQL query".to_string());
+    };
+
+    let Some(rest) = statement.strip_prefix("SELECT * FROM ") else {
+        return Err(format!(
+            "unsupported AQL statement (only 'SELECT * FROM <source> WHERE <expr>' is supported): {statement}"
+        ));
+    };
+    let Some(where_idx) = rest.find(" WHERE ") else {
+        return Err("no WHERE clause found in AQL query".to_string());
+    };
+    let source = rest[..where_idx].trim().to_string();
+    let expr = rest[where_idx + " WHERE ".len()..].trim();
+    if expr.is_empty() {
+        return Err("empty WHERE clause in AQL query".to_string());
+    }
+
+    let fields = parse_aql_predicate(expr)?;
+    let block_name = "selection".to_string();
+    let blocks = vec![SelectionBlock {
+        name: block_name.clone(),
+        fields,
+    }];
+    let condition = ConditionExpr::Block(block_name);
+
+    Ok(RuleAst {
+        title,
+        source,
+        blocks,
+        condition,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1514,5 +1771,72 @@ detection:
     fn spl_missing_sourcetype_is_rejected() {
         let spl = "| where User=\"admin\"\n";
         assert!(parse_spl(spl).is_err());
+    }
+
+    #[test]
+    fn to_aql_emits_select_where_from_sigma() {
+        let d = parse_sigma_rule(SIGMA_SIMPLE).unwrap();
+        let aql = to_aql(&d);
+        assert!(aql.contains("SELECT * FROM DeviceProcessEvents WHERE"));
+        assert!(aql.contains("Image LIKE '%\\powershell.exe'"));
+        assert!(aql.contains("CommandLine LIKE '%-EncodedCommand%'"));
+        assert!(aql.contains(" AND "));
+    }
+
+    #[test]
+    fn parse_aql_round_trips_simple_where() {
+        let aql = "-- Suspicious PowerShell EncodedCommand\nSELECT * FROM WinEventLog WHERE (Image LIKE '%\\powershell.exe' AND CommandLine LIKE '%-EncodedCommand%')\n";
+        let d = parse_aql(aql).expect("should parse");
+        assert_eq!(d.source, "WinEventLog");
+        assert_eq!(d.title, "Suspicious PowerShell EncodedCommand");
+        assert_eq!(d.blocks[0].fields.len(), 2);
+    }
+
+    #[test]
+    fn aql_round_trip_from_sigma_preserves_logic() {
+        let sigma_ast = parse_sigma_rule(SIGMA_SIMPLE).unwrap();
+        let aql = to_aql(&sigma_ast);
+        let aql_ast = parse_aql(&aql).expect("emitted AQL should parse back");
+        assert_eq!(aql_ast.blocks[0].fields.len(), 2);
+        let regenerated_sigma = to_sigma(&aql_ast, "windows", "process_creation");
+        let sigma_ast2 =
+            parse_sigma_rule(&regenerated_sigma).expect("regenerated Sigma should parse");
+        assert_eq!(sigma_ast2.blocks[0].fields.len(), 2);
+    }
+
+    #[test]
+    fn aql_multi_value_or_group_round_trips() {
+        let sigma_ast = parse_sigma_rule(SIGMA_MULTI_VALUE).unwrap();
+        let aql = to_aql(&sigma_ast);
+        let aql_ast = parse_aql(&aql).expect("should parse OR-group");
+        assert_eq!(aql_ast.blocks[0].fields.len(), 1);
+        assert_eq!(aql_ast.blocks[0].fields[0].values.len(), 2);
+    }
+
+    #[test]
+    fn aql_equals_predicate_round_trips() {
+        let aql = "SELECT * FROM auth WHERE User = 'admin'\n";
+        let d = parse_aql(aql).expect("should parse");
+        assert_eq!(d.blocks[0].fields[0].modifier, Modifier::Equals);
+        assert_eq!(d.blocks[0].fields[0].values[0], "admin");
+    }
+
+    #[test]
+    fn aql_regex_predicate_round_trips() {
+        let aql = "SELECT * FROM auth WHERE CommandLine IMATCHES '^net\\.exe .*'\n";
+        let d = parse_aql(aql).expect("should parse");
+        assert_eq!(d.blocks[0].fields[0].modifier, Modifier::Regex);
+    }
+
+    #[test]
+    fn unsupported_aql_statement_is_rejected() {
+        let aql = "SELECT COUNT(*) FROM events WHERE User = 'admin'\n";
+        assert!(parse_aql(aql).is_err());
+    }
+
+    #[test]
+    fn aql_missing_where_is_rejected() {
+        let aql = "SELECT * FROM events\n";
+        assert!(parse_aql(aql).is_err());
     }
 }
