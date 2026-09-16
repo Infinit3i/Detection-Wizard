@@ -269,7 +269,10 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                             for (i, def) in TTP_CATALOG.iter().enumerate() {
                                 if def.id.to_lowercase().contains(&needle_global)
                                     || def.name.to_lowercase().contains(&needle_global)
-                                    || def.tactic.to_lowercase().contains(&needle_global)
+                                    || def
+                                        .tactics
+                                        .iter()
+                                        .any(|tac| tac.to_lowercase().contains(&needle_global))
                                 {
                                     hits.push(i);
                                 }
@@ -560,12 +563,15 @@ pub fn render_ui(app: &mut ToolSelectorApp, ctx: &egui::Context, back_to_menu: i
                             .show(ui, |ui| {
                                 let mut last_tactic = "";
                                 for (i, def) in TTP_CATALOG.iter().enumerate() {
-                                    if def.tactic != last_tactic {
+                                    let primary_tactic = def.tactics.first().copied().unwrap_or("");
+                                    if primary_tactic != last_tactic {
                                         ui.add_space(6.0);
                                         ui.label(
-                                            egui::RichText::new(def.tactic).strong().size(13.0),
+                                            egui::RichText::new(primary_tactic)
+                                                .strong()
+                                                .size(13.0),
                                         );
-                                        last_tactic = def.tactic;
+                                        last_tactic = primary_tactic;
                                     }
                                     let indent = if def.id.contains('.') { "    " } else { "" };
                                     ui.checkbox(
